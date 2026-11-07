@@ -226,6 +226,11 @@ type countdownApp struct {
 	alerted time.Time // target for which the alert already played
 }
 
+// sameTarget is how far a live arrival estimate may drift and still count
+// as the same bus. Real-time feeds move the timestamp by seconds every
+// minute; without this the alert would replay on every update.
+const sameTarget = 10 * time.Minute
+
 func (a *countdownApp) Name() string       { return a.cfg.Name }
 func (a *countdownApp) Entities() []string { return []string{a.cfg.Entity} }
 func (a *countdownApp) Ticking() bool      { return true }
@@ -263,12 +268,20 @@ func (a *countdownApp) Render(st States, now time.Time) []Message {
 	a.visible = true
 
 	if a.cfg.AlertAt > 0 && a.cfg.AlertRTTTL != "" && remaining > 0 &&
-		remaining <= a.cfg.AlertAt.D() && !a.alerted.Equal(target) {
+		remaining <= a.cfg.AlertAt.D() && !a.alreadyAlerted(target) {
 		a.alerted = target
 		p, _ := json.Marshal(map[string]string{"rtttl": a.cfg.AlertRTTTL})
 		msgs = append(msgs, Message{Topic: a.topics.Sound, Payload: p, Once: true})
 	}
 	return msgs
+}
+
+func (a *countdownApp) alreadyAlerted(target time.Time) bool {
+	if a.alerted.IsZero() {
+		return false
+	}
+	d := target.Sub(a.alerted)
+	return d > -sameTarget && d < sameTarget
 }
 
 func (a *countdownApp) hide(topic string) []Message {

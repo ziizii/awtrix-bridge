@@ -42,8 +42,18 @@ Set `LOG_LEVEL=debug` to log every MQTT publish.
 ### Credentials
 
 - **HA token**: HA → Profile → Security → Long-lived access tokens.
-- **MQTT**: create a dedicated HA user (e.g. `awtrix-bridge`) — the Mosquitto
-  add-on accepts HA users — or add one under the add-on's `logins` option.
+- **MQTT**: use the broker HA's MQTT integration points at (Settings → Devices
+  & services → MQTT). Here that is the TeslaMate Mosquitto on the containers
+  host (`192.168.11.239:1883`), which allows anonymous clients, so username
+  and password stay empty. The integration is titled "Mosquitto broker", but
+  the HA Mosquitto app is not the broker the clock uses.
+
+### Clock firmware notes
+
+The clock runs `awtrixng` firmware. An empty payload on
+`awtrix/cmd/apps/pushed/<app>` deletes the app (verified). Apps can also be
+disabled in the clock's own app loop (`http://<clock>/apploop.json`,
+`/api/v1/apps`); a disabled app receives payloads but is never shown.
 
 ## Migrating from the HA automations
 

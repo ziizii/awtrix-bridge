@@ -107,6 +107,38 @@ func TestCountdown(t *testing.T) {
 	}
 }
 
+func TestCountdownAlertOncePerBus(t *testing.T) {
+	now := time.Date(2026, 11, 7, 16, 17, 0, 0, time.UTC)
+	a := &countdownApp{topics: topics, cfg: config.App{
+		Name: "bus333", Entity: "sensor.bus", ShowWithin: config.Duration(30 * time.Minute),
+		AlertAt: config.Duration(5 * time.Minute), AlertRTTTL: "beep",
+	}}
+	sounds := func(msgs []Message) (n int) {
+		for _, m := range msgs {
+			if m.Topic == "snd" {
+				n++
+			}
+		}
+		return
+	}
+	// Live estimates for one bus, as sensor.next_333_arrival reports them
+	// minute by minute: the target moves by seconds each update.
+	estimates := []string{"16:21:21", "16:21:31", "16:22:14", "16:21:48", "16:22:04"}
+	total := 0
+	for i, e := range estimates {
+		target, _ := time.Parse(time.RFC3339, "2026-11-07T"+e+"Z")
+		total += sounds(a.Render(fake{"sensor.bus": target.Format(time.RFC3339)}, now.Add(time.Duration(i)*time.Minute)))
+	}
+	if total != 1 {
+		t.Errorf("want 1 alert for one bus, got %d", total)
+	}
+	// The next bus two hours later alerts again.
+	next := time.Date(2026, 11, 7, 18, 18, 0, 0, time.UTC)
+	if n := sounds(a.Render(fake{"sensor.bus": next.Format(time.RFC3339)}, next.Add(-4*time.Minute))); n != 1 {
+		t.Errorf("next bus: want 1 alert, got %d", n)
+	}
+}
+
 func TestSwitchTopic(t *testing.T) {
 	if got := switchTopic("awtrix/cmd/apps/pushed/{name}"); got != "awtrix/cmd/apps/switch" {
 		t.Errorf("got %q", got)

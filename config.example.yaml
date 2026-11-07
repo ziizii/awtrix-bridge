@@ -6,7 +6,7 @@ homeassistant:
   token: ${HA_TOKEN}      # long-lived access token (Profile -> Security)
 
 mqtt:
-  broker: ${MQTT_BROKER}  # e.g. tcp://homeassistant.local:1883 (Mosquitto add-on)
+  broker: ${MQTT_BROKER}  # the broker HA's MQTT integration uses (TeslaMate mosquitto)
   username: ${MQTT_USERNAME}
   password: ${MQTT_PASSWORD}
   client_id: awtrix-bridge
