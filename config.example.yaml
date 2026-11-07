@@ -1,0 +1,85 @@
+# awtrix-bridge configuration. ${VARS} are expanded from the environment.
+# This mirrors the current "AWTRIX - Update Apps" + "Bus Arrival Notification" automations.
+
+homeassistant:
+  url: ${HA_URL}          # e.g. http://homeassistant.local:8123
+  token: ${HA_TOKEN}      # long-lived access token (Profile -> Security)
+
+mqtt:
+  broker: ${MQTT_BROKER}  # e.g. tcp://homeassistant.local:1883 (Mosquitto add-on)
+  username: ${MQTT_USERNAME}
+  password: ${MQTT_PASSWORD}
+  client_id: awtrix-bridge
+
+awtrix:
+  app_topic: awtrix/cmd/apps/pushed/{name}
+  settings_topic: awtrix/cmd/settings
+  sound_topic: awtrix/cmd/audio/play
+  resync_interval: 5m     # re-push everything so the clock recovers after a reboot
+
+brightness:
+  quiet_entity: binary_sensor.heat_recovery_ventilation_quiet_time
+  quiet: 1
+  normal: 255
+
+apps:
+  - name: radon
+    type: value
+    entity: sensor.radon_level
+    icon: "2644"
+    format: "Rn %.0f Bq"
+    colors:                       # first match wins; entry without "below" is the fallback
+      - { below: 100, color: "#00FF00" }
+      - { below: 300, color: "#FFAA00" }
+      - { color: "#FF2200" }
+
+  - name: solar
+    type: value
+    entity: sensor.inverter_pv_power
+    icon: "27283"
+    format: "%.0fW"
+    color: "#FFCC00"
+
+  - name: load
+    type: value
+    entity: sensor.inverter_activepower_load_sys
+    icon: "21520"
+    format: "%.0fW"
+    color: "#00AAFF"
+
+  - name: surplus
+    type: surplus
+    production: sensor.inverter_pv_power
+    consumption: sensor.inverter_activepower_load_sys
+    icon: "27283"
+    night_icon: "13345"           # used when PV production is 0
+    positive_color: "#00FF00"
+    negative_color: "#FF4400"
+
+  - name: temp_out
+    type: value
+    entity: sensor.comfoairq_outside_temperature
+    icon: "6401"
+    format: "%.1f"
+    color: "#00CCFF"
+
+  - name: temp_in
+    type: value
+    entity: sensor.thermostat_current_temperature
+    icon: "7112"
+    format: "%.1f"
+    color: "#FF8800"
+
+  - name: bus333
+    type: countdown
+    entity: sensor.next_333_arrival
+    icon: "11999"
+    show_within: 30m              # hidden otherwise
+    hold_after: 30s               # keep "Now!" briefly after arrival
+    alert_at: 5m                  # beep once when 5 minutes remain
+    alert_rtttl: "two:d=4,o=5,b=200:c,e"
+    switch_to: true               # jump to this app when it appears
+    colors:                       # thresholds in minutes remaining
+      - { below: 2, color: "#FF2200" }
+      - { below: 6, color: "#FFAA00" }
+      - { color: "#00FF00" }

@@ -1,0 +1,11 @@
+services:
+  awtrix-bridge:
+    image: ghcr.io/ziizii/awtrix-bridge:latest
+    # build: .   # uncomment to build locally from source instead
+    container_name: awtrix-bridge
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - ./config.yaml:/config/config.yaml:ro
