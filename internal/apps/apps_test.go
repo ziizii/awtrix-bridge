@@ -257,7 +257,7 @@ func TestCountdownSwitchAt(t *testing.T) {
 }
 
 func TestSwitchTopic(t *testing.T) {
-	if got := switchTopic("awtrix/cmd/apps/pushed/{name}"); got != "awtrix/cmd/apps/switch" {
+	if got := SwitchTopic("awtrix/cmd/apps/pushed/{name}"); got != "awtrix/cmd/apps/switch" {
 		t.Errorf("got %q", got)
 	}
 }

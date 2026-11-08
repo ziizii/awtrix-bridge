@@ -12,8 +12,14 @@ import (
 )
 
 type fakeBackend struct {
-	applied string
-	armed   map[string]bool
+	applied  string
+	armed    map[string]bool
+	switched string
+}
+
+func (f *fakeBackend) Switch(name string) error {
+	f.switched = name
+	return nil
 }
 
 func (f *fakeBackend) Raw() ([]byte, error) { return []byte("apps: []\n"), nil }
@@ -66,5 +72,11 @@ func TestAdmin(t *testing.T) {
 	}
 	if w := do(h, "POST", "/api/arm", "application/json", `{"app":"bus333","armed":true}`); w.Code != 200 || !b.armed["bus333"] {
 		t.Errorf("arm: %d %v", w.Code, b.armed)
+	}
+	if w := do(h, "POST", "/api/switch", "text/plain", `{"app":"temp_out"}`); w.Code != http.StatusUnsupportedMediaType || b.switched != "" {
+		t.Errorf("switch accepted text/plain: %d", w.Code)
+	}
+	if w := do(h, "POST", "/api/switch", "application/json", `{"app":"temp_out"}`); w.Code != 200 || b.switched != "temp_out" {
+		t.Errorf("switch: %d %q", w.Code, b.switched)
 	}
 }

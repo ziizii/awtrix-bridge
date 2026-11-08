@@ -40,7 +40,9 @@ Only a bus arriving after the moment of arming disarms it.
 
 With `ADMIN_ADDR` set (compose: `:8080`, published on host port `8095`) the
 bridge serves a small page: the arm button, what each app currently shows on
-the clock, recent switches/sounds, and a YAML editor. **Save & reload**
+the clock (tap a box, including the built-in Time and Date, to switch the
+clock to it; the one on screen is highlighted), recent switches/sounds, and
+a YAML editor. **Save & reload**
 validates the config, writes `config.yaml` and restarts the pipeline in
 place; apps removed from the config are deleted from the clock. There is no
 password, so keep it on the LAN. `${VAR}` references stay unexpanded in the

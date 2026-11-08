@@ -4,6 +4,7 @@ package bridge
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -143,6 +144,7 @@ type Status struct {
 	Apps    []engine.Published `json:"apps"`
 	Recent  []engine.Published `json:"recent"`
 	Arms    []engine.ArmState  `json:"arms"`
+	Active  string             `json:"active"` // app on screen, as the clock reports it
 }
 
 func (s *Supervisor) Status() Status {
@@ -153,8 +155,29 @@ func (s *Supervisor) Status() Status {
 		st.MQTT = inst.pub.c.IsConnectionOpen()
 		st.Apps, st.Recent = inst.eng.Status()
 		st.Arms = inst.eng.Arms()
+		st.Active = inst.activeApp()
 	}
 	return st
+}
+
+// Switch shows the named app on the clock now.
+func (s *Supervisor) Switch(name string) error {
+	s.mu.Lock()
+	inst := s.cur
+	s.mu.Unlock()
+	if inst == nil {
+		return errors.New("bridge not running")
+	}
+	known := name == "Time" || name == "Date" // the clock's built-in apps
+	for _, a := range inst.cfg.Apps {
+		known = known || a.Name == name
+	}
+	topic := apps.SwitchTopic(inst.cfg.Awtrix.AppTopic)
+	if !known || topic == "" {
+		return fmt.Errorf("cannot switch to %q", name)
+	}
+	p, _ := json.Marshal(map[string]any{"name": name, "fast": true})
+	return inst.pub.Publish(topic, p, false)
 }
 
 // SetArmed arms or disarms an app by publishing its retained arm state;
@@ -203,6 +226,15 @@ type instance struct {
 	cancel context.CancelFunc
 	done   chan struct{}
 	log    *slog.Logger
+
+	activeMu sync.Mutex
+	active   string // app the clock reports on screen
+}
+
+func (i *instance) activeApp() string {
+	i.activeMu.Lock()
+	defer i.activeMu.Unlock()
+	return i.active
 }
 
 func start(parent context.Context, cfg *config.Config, prev []apps.App, log *slog.Logger) (*instance, error) {
@@ -234,6 +266,13 @@ func start(parent context.Context, cfg *config.Config, prev []apps.App, log *slo
 			for name, topic := range inst.eng.ArmTopics() {
 				c.Subscribe(topic, 1, func(_ mqtt.Client, m mqtt.Message) {
 					inst.eng.SetArmed(name, string(m.Payload()) == "on")
+				})
+			}
+			if t := cfg.Awtrix.ActiveTopic; t != "" {
+				c.Subscribe(t, 0, func(_ mqtt.Client, m mqtt.Message) {
+					inst.activeMu.Lock()
+					inst.active = string(m.Payload())
+					inst.activeMu.Unlock()
 				})
 			}
 			inst.eng.ForceResync()

@@ -49,6 +49,8 @@ type Awtrix struct {
 	AppTopic      string `yaml:"app_topic"`
 	SettingsTopic string `yaml:"settings_topic"`
 	SoundTopic    string `yaml:"sound_topic"`
+	// ActiveTopic is where the clock reports the app on screen (admin UI only).
+	ActiveTopic string `yaml:"active_topic"`
 	// ArmTopic holds the retained on/off arm state of require_arm apps; "{name}" is replaced.
 	ArmTopic string `yaml:"arm_topic"`
 	// ResyncInterval re-publishes every app periodically so the clock recovers after a reboot.
@@ -137,6 +139,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Awtrix.SoundTopic == "" {
 		c.Awtrix.SoundTopic = "awtrix/cmd/audio/play"
+	}
+	if c.Awtrix.ActiveTopic == "" {
+		c.Awtrix.ActiveTopic = "awtrix/state/apps/active"
 	}
 	if c.Awtrix.ArmTopic == "" {
 		c.Awtrix.ArmTopic = "awtrix-bridge/{name}/armed"

@@ -25,6 +25,7 @@ type Backend interface {
 	Reload(ctx context.Context) error
 	Status() bridge.Status
 	SetArmed(name string, on bool) error
+	Switch(name string) error
 }
 
 const maxConfig = 1 << 20
@@ -99,6 +100,24 @@ func Handler(b Backend) http.Handler {
 			return
 		}
 		if err := b.SetArmed(in.App, in.Armed); err != nil {
+			fail(w, http.StatusUnprocessableEntity, err)
+			return
+		}
+		reply(w, http.StatusOK, map[string]bool{"ok": true})
+	})
+	mux.HandleFunc("POST /api/switch", func(w http.ResponseWriter, r *http.Request) {
+		if !isJSON(r) {
+			fail(w, http.StatusUnsupportedMediaType, errJSON)
+			return
+		}
+		var in struct {
+			App string `json:"app"`
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&in); err != nil {
+			fail(w, http.StatusBadRequest, err)
+			return
+		}
+		if err := b.Switch(in.App); err != nil {
 			fail(w, http.StatusUnprocessableEntity, err)
 			return
 		}

@@ -62,7 +62,7 @@ func Build(c *config.Config) ([]App, error) {
 		App:      c.Awtrix.AppTopic,
 		Settings: c.Awtrix.SettingsTopic,
 		Sound:    c.Awtrix.SoundTopic,
-		Switch:   switchTopic(c.Awtrix.AppTopic),
+		Switch:   SwitchTopic(c.Awtrix.AppTopic),
 		Arm:      c.Awtrix.ArmTopic,
 	}
 	var out []App
@@ -84,8 +84,8 @@ func Build(c *config.Config) ([]App, error) {
 	return out, nil
 }
 
-// switchTopic derives ".../apps/switch" from ".../apps/pushed/{name}".
-func switchTopic(appTopic string) string {
+// SwitchTopic derives ".../apps/switch" from ".../apps/pushed/{name}".
+func SwitchTopic(appTopic string) string {
 	if i := strings.Index(appTopic, "/pushed/"); i >= 0 {
 		return appTopic[:i] + "/switch"
 	}

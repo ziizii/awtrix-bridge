@@ -40,7 +40,12 @@ button:disabled { opacity: .5; cursor: default; }
 button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
 button.big { padding: 12px 20px; font-size: 16px; min-width: 180px; }
 .apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
-.app { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.app { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; text-align: left; width: 100%; }
+button.app { cursor: pointer; font: inherit; color: inherit; background: var(--card); }
+button.app:hover:not(:disabled) { border-color: var(--accent); }
+button.app:disabled { opacity: 1; cursor: default; }
+.app.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.app.active .n::after { content: " · on screen"; color: var(--accent); }
 .app .n { font-size: 12px; color: var(--muted); }
 .led { background: var(--led); color: #fff; border-radius: 4px; padding: 3px 8px; margin-top: 4px;
   font: 600 16px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -71,7 +76,7 @@ code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
   </section>
 
   <section>
-    <h2>On the clock</h2>
+    <h2>On the clock <span style="text-transform:none;letter-spacing:0;font-weight:400">· tap to show it</span></h2>
     <div class="apps" id="apps"><span class="empty">Waiting for data…</span></div>
   </section>
 
@@ -117,57 +122,94 @@ function ago(t) {
 function clock(t) { return new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }); }
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 
-function ledFor(p) {
-  const led = el("div", "led");
-  if (!p.payload) { led.classList.add("off"); led.textContent = "hidden"; return led; }
+// Elements are created once and updated in place: replacing them every
+// second would swallow clicks that land mid-update.
+function setLed(led, p) {
+  led.className = "led"; led.style.color = "";
+  if (!p.payload) { led.classList.add("off"); led.textContent = "hidden"; return; }
   try {
     const j = JSON.parse(p.payload);
     if (j.text != null) { led.textContent = j.text; if (j.textColor) led.style.color = j.textColor; }
-    else if (j.brightness != null) { led.textContent = "☀ " + j.brightness; }
+    else if (j.brightness != null) led.textContent = "☀ " + j.brightness;
     else led.textContent = p.payload;
   } catch { led.textContent = p.payload; }
-  return led;
+}
+
+// keyed keeps one element per key inside parent, in the given order.
+function keyed(parent, items, key, create, update) {
+  const old = new Map([...parent.children].filter(c => c.dataset.key).map(c => [c.dataset.key, c]));
+  [...parent.children].filter(c => !c.dataset.key).forEach(c => c.remove());
+  items.forEach((it, i) => {
+    let node = old.get(key(it));
+    if (!node) { node = create(it); node.dataset.key = key(it); }
+    old.delete(key(it));
+    update(node, it);
+    if (parent.children[i] !== node) parent.insertBefore(node, parent.children[i] || null);
+  });
+  old.forEach(n => n.remove());
 }
 
 function renderStatus(s) {
-  $("meta").replaceChildren();
-  const dot = el("span", "dot" + (s.mqtt ? " on" : ""));
-  $("meta").append(dot, (s.mqtt ? "MQTT connected" : "MQTT disconnected") + " · config loaded " + ago(s.loaded));
+  $("meta").replaceChildren(el("span", "dot" + (s.mqtt ? " on" : "")),
+    (s.mqtt ? "MQTT connected" : "MQTT disconnected") + " · config loaded " + ago(s.loaded));
 
   const byApp = {};
   (s.apps || []).forEach(p => { if (!byApp[p.app]) byApp[p.app] = p; });
 
   const arms = s.arms || [];
   $("arms-section").hidden = arms.length === 0;
-  $("arms").replaceChildren(...arms.map(a => {
+  keyed($("arms"), arms, a => a.app, a => {
     const row = el("div", "arm");
     const info = el("div");
-    info.append(el("div", "name", a.app));
-    const st = el("div", "state");
-    if (a.armed) { st.append(el("b", null, "Armed"), " · on the clock now, disarms itself after the bus arrives"); }
-    else st.textContent = "Off · hidden on the clock";
-    info.append(st);
+    row._state = el("div", "state");
+    info.append(el("div", "name", a.app), row._state);
     const right = el("div");
-    right.style.display = "flex"; right.style.gap = "12px"; right.style.alignItems = "center";
-    if (a.armed && byApp[a.app]) right.append(ledFor(byApp[a.app]));
-    const btn = el("button", "big" + (a.armed ? "" : " primary"), a.armed ? "Disarm" : "Arm for next bus");
-    btn.onclick = async () => {
-      btn.disabled = true;
-      try { await api("POST", "/api/arm", { app: a.app, armed: !a.armed }); setTimeout(poll, 300); }
-      catch (e) { alert(e.message); btn.disabled = false; }
+    right.style.cssText = "display:flex;gap:12px;align-items:center";
+    row._led = el("div", "led");
+    row._btn = el("button", "big");
+    row._btn.onclick = async () => {
+      row._btn.disabled = true;
+      try { await api("POST", "/api/arm", { app: row._a.app, armed: !row._a.armed }); setTimeout(poll, 300); }
+      catch (e) { alert(e.message); }
+      row._btn.disabled = false;
     };
-    right.append(btn);
+    right.append(row._led, row._btn);
     row.append(info, right);
     return row;
-  }));
+  }, (row, a) => {
+    row._a = a;
+    row._state.replaceChildren(...(a.armed
+      ? [el("b", null, "Armed"), " · on the clock now, disarms itself after the bus arrives"]
+      : ["Off · hidden on the clock"]));
+    row._led.hidden = !(a.armed && byApp[a.app]);
+    if (byApp[a.app]) setLed(row._led, byApp[a.app]);
+    row._btn.textContent = a.armed ? "Disarm" : "Arm for next bus";
+    row._btn.className = "big" + (a.armed ? "" : " primary");
+  });
 
-  const apps = s.apps || [];
-  $("apps").replaceChildren(...(apps.length ? apps.map(p => {
-    const d = el("div", "app");
-    d.append(el("div", "n", p.app), ledFor(p));
-    d.title = p.topic + "\nupdated " + ago(p.at);
+  const now = new Date();
+  const builtin = [
+    { app: "Time", payload: JSON.stringify({ text: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }) }), switchable: true },
+    { app: "Date", payload: JSON.stringify({ text: now.toLocaleDateString([], { day: "numeric", month: "numeric" }) }), switchable: true },
+  ];
+  const apps = builtin.concat((s.apps || []).map(p => ({ ...p, switchable: p.topic.includes("/pushed/") })));
+  keyed($("apps"), apps, p => p.app, p => {
+    const d = el("button", "app");
+    d._n = el("div", "n", p.app); d._led = el("div", "led");
+    d.append(d._n, d._led);
+    d.onclick = async () => {
+      if (d.disabled) return;
+      try { await api("POST", "/api/switch", { app: d._p.app }); setTimeout(poll, 400); }
+      catch (e) { alert(e.message); }
+    };
     return d;
-  }) : [el("span", "empty", "Nothing published yet.")]));
+  }, (d, p) => {
+    d._p = p;
+    setLed(d._led, p);
+    d.disabled = !(p.switchable && p.payload);
+    d.classList.toggle("active", p.app === s.active);
+    d.title = p.at ? p.topic + "\nupdated " + ago(p.at) : "clock built-in app";
+  });
 
   const rec = (s.recent || []).slice().reverse();
   $("recent").replaceChildren(...(rec.length ? rec.map(p => {
