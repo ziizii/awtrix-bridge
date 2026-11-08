@@ -34,7 +34,9 @@ chime:                          # melody at every full hour; pick one in the adm
 timer:                          # optional: the timer started from the admin UI
   melody: beeps                 # played at the end; pick one in the admin UI, or off
   # icon: "1820"
-  # color: "#FFFFFF"            # while running; done_color after the end
+  # color: "#FFFFFF"            # text while running; done_color after the end
+  # progress_color: "#FFFFFF"   # the bar on the bottom row (default: color)
+  # track_color: "#303030"      # the bar's unfilled part
   # hold_after: 1m              # counts up this long after the end
   # switch_back: Time           # default: the app on screen when it started
 

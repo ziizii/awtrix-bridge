@@ -74,13 +74,16 @@ const TimerApp = "timer"
 // time of day. While it runs the clock shows it; when it ends it plays a
 // melody, counts up for HoldAfter, then switches back.
 type Timer struct {
-	Icon       string   `yaml:"icon"`
-	Color      string   `yaml:"color"`       // while running
-	DoneColor  string   `yaml:"done_color"`  // after it ends
-	Melody     string   `yaml:"melody"`      // a Melodies name or "off"; default beeps
-	RTTTL      string   `yaml:"rtttl"`       // custom tune when Melody is empty
-	HoldAfter  Duration `yaml:"hold_after"`  // count up this long after it ends (default 1m)
-	SwitchBack string   `yaml:"switch_back"` // app to show afterwards; default: the one on screen when it started
+	Icon      string `yaml:"icon"`
+	Color     string `yaml:"color"`      // text while running
+	DoneColor string `yaml:"done_color"` // text after it ends
+	// The progress bar on the bottom row: the elapsed part and the rest.
+	ProgressColor string   `yaml:"progress_color"`
+	TrackColor    string   `yaml:"track_color"`
+	Melody        string   `yaml:"melody"`      // a Melodies name or "off"; default beeps
+	RTTTL         string   `yaml:"rtttl"`       // custom tune when Melody is empty
+	HoldAfter     Duration `yaml:"hold_after"`  // count up this long after it ends (default 1m)
+	SwitchBack    string   `yaml:"switch_back"` // app to show afterwards; default: the one on screen when it started
 }
 
 // Tune returns the RTTTL to play when the timer ends, or "" for none.

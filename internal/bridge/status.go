@@ -21,6 +21,7 @@ type Status struct {
 	Chime      ChimeStatus        `json:"chime"`
 	Timer      TimerStatus        `json:"timer"`
 	Rejected   []Rejection        `json:"rejected"` // commands the clock currently refuses
+	Colors     ColorsStatus       `json:"colors"`   // what the Colors page can change
 	Melodies   []config.Melody    `json:"melodies"` // built-in tunes for chime and alerts
 }
 
@@ -71,6 +72,7 @@ func (s *Supervisor) Status() Status {
 	st.Active = inst.activeApp()
 	st.Clock = inst.clockSettings()
 	st.Rejected = inst.rejected.list()
+	st.Colors = inst.colorsStatus()
 	st.Apps = inst.eng.Shown()
 	st.Recent = inst.eng.Recent()
 	st.Chime = inst.chimeStatus()

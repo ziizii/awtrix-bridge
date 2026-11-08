@@ -27,5 +27,6 @@ export const api = {
   startTimerAt: at => call("POST", "/api/timer", { at }),
   extendTimer: seconds => call("POST", "/api/timer/extend", { seconds }),
   cancelTimer: () => call("POST", "/api/timer/cancel", {}),
+  setColor: (target, app, key, value) => call("POST", "/api/color", { target, app, key, value }),
   setTimerMelody: melody => call("POST", "/api/timer/melody", { melody }),
 };

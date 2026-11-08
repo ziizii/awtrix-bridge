@@ -105,3 +105,51 @@ func TestTimerDefaults(t *testing.T) {
 		t.Errorf("app named timer accepted")
 	}
 }
+
+func TestSetThresholdColor(t *testing.T) {
+	in := base + `apps:
+  - name: radon
+    type: value
+    entity: e
+    color: "#FFFFFF"              # fallback
+    colors:                       # first match wins
+      - { below: 100, color: "#00FF00" }
+      - { below: 300, color: '#FFAA00' }   # orange
+      - { color: "#FF2200" }
+
+  - name: bus
+    type: countdown
+    entity: e
+    colors:
+    - below: 2
+      color: "#FF2200"
+    - color: "#00FF00"
+`
+	out, err := SetThresholdColor([]byte(in), "radon", 1, "#123456")
+	if err != nil || !strings.Contains(string(out), `      - { below: 300, color: "#123456" }   # orange`) ||
+		!strings.Contains(string(out), `color: "#FFFFFF"              # fallback`) {
+		t.Errorf("flow entry: %v\n%s", err, out)
+	}
+	out, err = SetThresholdColor([]byte(in), "bus", 1, "#ABCDEF")
+	if err != nil || !strings.Contains(string(out), "    - color: \"#ABCDEF\"\n") || !strings.Contains(string(out), `      color: "#FF2200"`) {
+		t.Errorf("block entry: %v\n%s", err, out)
+	}
+	out, _ = SetThresholdColor([]byte(in), "bus", 0, "#000001")
+	if !strings.Contains(string(out), "    - below: 2\n      color: \"#000001\"") {
+		t.Errorf("block entry 0:\n%s", out)
+	}
+	if _, err := SetThresholdColor([]byte(in), "radon", 3, "#000000"); err == nil {
+		t.Errorf("entry 3 accepted")
+	}
+	if _, err := Parse(out); err != nil {
+		t.Errorf("edited file does not parse: %v", err)
+	}
+}
+
+func TestCheckColor(t *testing.T) {
+	for c, ok := range map[string]bool{"#FFaa00": true, "#FFF": false, "FFAA00": false, "#GGGGGG": false, "": false} {
+		if (CheckColor(c) == nil) != ok {
+			t.Errorf("%q: want ok=%v", c, ok)
+		}
+	}
+}

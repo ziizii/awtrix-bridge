@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -48,6 +49,49 @@ func SetApp(raw []byte, app string, fields []Field, comment ...string) ([]byte, 
 	l.set(b, fields, comment)
 	return l.bytes(), nil
 }
+
+// SetThresholdColor sets the color of entry index of an app's colors
+// list, in flow style ("- { below: 2, color: x }") or block style.
+func SetThresholdColor(raw []byte, app string, index int, color string) ([]byte, error) {
+	l := lines(strings.Split(string(raw), "\n"))
+	b, ok := l.listItem(app)
+	if !ok {
+		return nil, fmt.Errorf("app %q not found as a \"- name: %s\" entry in the config file", app, app)
+	}
+	k := l.find(b, "colors")
+	if k < 0 {
+		return nil, fmt.Errorf("app %q has no colors list", app)
+	}
+	entry, base := -1, -1
+	for i := k + 1; i < len(l); i++ {
+		s, t := l[i], strings.TrimSpace(l[i])
+		if t == "" || strings.HasPrefix(t, "#") {
+			continue
+		}
+		ind := indentOf(s)
+		if ind < b.indent || (ind == b.indent && !strings.HasPrefix(t, "- ")) {
+			break // left the list
+		}
+		if strings.HasPrefix(t, "- ") && (base < 0 || ind == base) {
+			base = ind
+			entry++
+		}
+		if entry > index {
+			break
+		}
+		if m := colorValue.FindStringSubmatchIndex(s); entry == index && m != nil {
+			l[i] = s[:m[4]] + quote(color) + s[m[5]:]
+			return l.bytes(), nil
+		}
+	}
+	return nil, fmt.Errorf("app %q has no colors entry %d with a color", app, index)
+}
+
+// colorValue finds the value of a "color:" key (not "textColor:").
+var colorValue = regexp.MustCompile(`(^|[\s{,-])color:\s*("[^"]*"|'[^']*'|[^\s,}#]+)`)
+
+// quote makes a YAML string value; "#" would otherwise start a comment.
+func quote(v string) string { return `"` + v + `"` }
 
 type lines []string
 

@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"time"
 )
 
@@ -26,6 +27,8 @@ func (c *Config) applyDefaults() {
 	}
 	setDefault(&t.Color, "#FFFFFF")
 	setDefault(&t.DoneColor, "#FF3B30")
+	setDefault(&t.ProgressColor, t.Color)
+	setDefault(&t.TrackColor, "#303030")
 	if t.HoldAfter == 0 {
 		t.HoldAfter = Duration(time.Minute)
 	}
@@ -98,6 +101,16 @@ func (a App) validate() error {
 		}
 	default:
 		return fmt.Errorf("unknown type %q", a.Type)
+	}
+	return nil
+}
+
+var hexColor = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
+
+// CheckColor accepts colors as the clock takes them: "#RRGGBB".
+func CheckColor(c string) error {
+	if !hexColor.MatchString(c) {
+		return fmt.Errorf("color must look like #FFAA00, got %q", c)
 	}
 	return nil
 }

@@ -3,6 +3,8 @@ package bridge
 import (
 	"testing"
 	"time"
+
+	"github.com/ziizii/awtrix-bridge/internal/config"
 )
 
 func TestNextTimeOfDay(t *testing.T) {
@@ -30,5 +32,20 @@ func TestNextTimeOfDay(t *testing.T) {
 		if _, err := nextTimeOfDay(bad, now); err == nil {
 			t.Errorf("%q accepted", bad)
 		}
+	}
+}
+
+func TestAppColorFields(t *testing.T) {
+	two, six := 2.0, 6.0
+	bus := config.App{Name: "bus", Type: config.TypeCountdown, Colors: []config.Threshold{{Below: &two, Color: "#F00"}, {Below: &six, Color: "#FA0"}, {Color: "#0F0"}}}
+	got := appColorFields(bus)
+	if len(got) != 3 || got[0].Label != "Below 2 min" || got[2].Label != "Otherwise" || got[1].Key != "colors.1" {
+		t.Errorf("countdown: %+v", got)
+	}
+	if got := appColorFields(config.App{Type: config.TypeSurplus, PositiveColor: "#0F0"}); len(got) != 2 || got[0].Value != "#0F0" {
+		t.Errorf("surplus: %+v", got)
+	}
+	if got := appColorFields(config.App{Type: config.TypeValue, Color: "#FC0"}); len(got) != 1 || got[0].Key != "color" {
+		t.Errorf("value: %+v", got)
 	}
 }

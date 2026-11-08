@@ -93,8 +93,8 @@ func (a *timerApp) payload(t awtrix.Timer, now time.Time) []byte {
 	// The track is white unless set, which hides a white bar.
 	extra := map[string]any{
 		"progress":           barProgress(now.Sub(t.Start), t.End.Sub(t.Start)),
-		"progressColor":      a.cfg.Color,
-		"progressTrackColor": timerTrack,
+		"progressColor":      or(a.cfg.ProgressColor, a.cfg.Color),
+		"progressTrackColor": or(a.cfg.TrackColor, timerTrack),
 	}
 	return awtrix.AppPayload(a.cfg.Icon, timerText(secs), a.cfg.Color, extra)
 }

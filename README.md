@@ -65,6 +65,11 @@ bridge serves a small page, built for phones first:
   and every app with a preview; tap one (including the built-in Time and
   Date) to switch the clock to it.
 - **Sounds**: the hourly chime melody or off, with previews and the quiet time.
+- **Colors**: the clock's own colors (time, date, default text, weekday
+  bar; sent to the clock, which keeps them), the timer's (text, time's up,
+  progress bar and track) and each app's (single color, surplus/deficit,
+  or each threshold's color), with live previews. Timer and app colors are
+  written to `config.yaml`.
 - **Activity**: recent switches, sounds and arming, and the bridge's status.
 - **Config**: a YAML editor. **Save** validates the config,
   writes `config.yaml` and restarts the pipeline in place; apps removed from

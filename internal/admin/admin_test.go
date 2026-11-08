@@ -30,6 +30,10 @@ func (f *fakeBackend) ExtendTimer(seconds int) error {
 	f.timer = fmt.Sprintf("extend %d", seconds)
 	return nil
 }
+func (f *fakeBackend) SetColor(_ context.Context, target, app, key, value string) error {
+	f.timer = fmt.Sprintf("color %s %s %s %s", target, app, key, value)
+	return nil
+}
 func (f *fakeBackend) CancelTimer() error { f.timer = "cancel"; return nil }
 func (f *fakeBackend) SetTimerMelody(_ context.Context, melody string) error {
 	f.timer = "melody " + melody
@@ -119,11 +123,12 @@ func TestAdmin(t *testing.T) {
 		t.Errorf("set alert: %d %q", w.Code, b.alert)
 	}
 	for path, want := range map[string]string{
-		`/api/timer {"seconds":300}`:          "start 300 ",
-		`/api/timer {"at":"14:30"}`:           "start 0 14:30",
-		`/api/timer/extend {"seconds":60}`:    "extend 60",
-		`/api/timer/cancel {}`:                "cancel",
-		`/api/timer/melody {"melody":"ding"}`: "melody ding",
+		`/api/timer {"seconds":300}`:       "start 300 ",
+		`/api/timer {"at":"14:30"}`:        "start 0 14:30",
+		`/api/timer/extend {"seconds":60}`: "extend 60",
+		`/api/timer/cancel {}`:             "cancel",
+		`/api/color {"target":"app","app":"solar","key":"color","value":"#FFCC00"}`: "color app solar color #FFCC00",
+		`/api/timer/melody {"melody":"ding"}`:                                       "melody ding",
 	} {
 		p, body, _ := strings.Cut(path, " ")
 		if w := do(h, "POST", p, "application/json", body); w.Code != 200 || b.timer != want {
