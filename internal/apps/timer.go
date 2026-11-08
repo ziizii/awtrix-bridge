@@ -92,9 +92,10 @@ func (a *timerApp) payload(t awtrix.Timer, now time.Time) []byte {
 	extra := map[string]any{}
 	if total := t.End.Sub(t.Start); total > 0 {
 		p := int(100 * now.Sub(t.Start) / total)
+		// awtrixng rejects a whole payload with unknown keys, and knows
+		// only these two progress keys.
 		extra["progress"] = min(100, max(0, p))
-		extra["progressC"] = a.cfg.Color
-		extra["progressBC"] = "#303030"
+		extra["progressColor"] = a.cfg.Color
 	}
 	return awtrix.AppPayload(a.cfg.Icon, timerText(secs), a.cfg.Color, extra)
 }

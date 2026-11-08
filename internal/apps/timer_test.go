@@ -96,3 +96,16 @@ func TestTimerCancelAndRestart(t *testing.T) {
 		}
 	}
 }
+
+// awtrixng rejects payloads with keys it does not know.
+func TestTimerPayloadKeys(t *testing.T) {
+	now := time.Date(2026, 11, 8, 12, 0, 0, 0, time.UTC)
+	a := &timerApp{topics: topics, cfg: config.Timer{Icon: "1", Color: "#FFFFFF"}}
+	a.SetTimer(awtrix.Timer{Start: now, End: now.Add(time.Minute)})
+	known := map[string]bool{"text": true, "icon": true, "textColor": true, "progress": true, "progressColor": true}
+	for k := range decode(t, a.Render(nil, now)[0].Payload) {
+		if !known[k] {
+			t.Errorf("payload key %q", k)
+		}
+	}
+}

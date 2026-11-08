@@ -100,7 +100,7 @@ export function frameOf(payload, clock = {}) {
   if (j.rainbow) f.rainbow = true;
   if (j.progress != null && j.progress >= 0) {
     f.progress = Number(j.progress);
-    f.progressColor = color(j.progressC);
+    f.progressColor = color(j.progressColor ?? j.progressC);
   }
   return f;
 }
