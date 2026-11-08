@@ -22,6 +22,7 @@ type Topics struct {
 	Active        string // the clock reports the app on screen here
 	ClockSettings string // the clock reports its own settings here (JSON)
 	Timer         string // the bridge's retained timer state (JSON)
+	Device        string // the clock reports itself here (JSON with its IP)
 	app           string // contains {name}
 	arm           string // contains {name}
 }
@@ -34,6 +35,7 @@ func NewTopics(c config.Awtrix) Topics {
 		Active:        c.ActiveTopic,
 		ClockSettings: c.ClockSettingsTopic,
 		Timer:         c.TimerTopic,
+		Device:        c.DeviceTopic,
 		app:           c.AppTopic,
 		arm:           c.ArmTopic,
 	}

@@ -42,6 +42,7 @@ type TimerStatus struct {
 	End       time.Time `json:"end"`
 	HoldAfter int       `json:"hold_after"` // seconds it counts up after the end
 	Melody    string    `json:"melody"`     // melody name, "off", or "custom"
+	Icon      string    `json:"icon"`       // LaMetric icon id, "" = none
 }
 
 // ChimeStatus is the hourly chime choice and what silences it.
@@ -79,7 +80,7 @@ func (s *Supervisor) Status() Status {
 	t, tc := inst.eng.Timer(), inst.cfg.Timer
 	st.Timer = TimerStatus{
 		Running: t.Running(), Start: t.Start, End: t.End,
-		HoldAfter: int(tc.HoldAfter.D().Seconds()), Melody: melodyChoice(tc.Melody, tc.RTTTL),
+		HoldAfter: int(tc.HoldAfter.D().Seconds()), Melody: melodyChoice(tc.Melody, tc.RTTTL), Icon: tc.Icon,
 	}
 	for _, a := range inst.cfg.Apps {
 		if a.Type == config.TypeCountdown {

@@ -216,9 +216,56 @@ function melodyPicker() {
   grow.append(p.melody, playBtn);
   row.append(el("label", null, "Melody"), grow);
   const body = el("div", "disclose-body");
-  body.append(row);
+  body.append(row, iconRow());
   det.append(sum, body);
   return det;
+}
+
+// iconRow picks the timer's icon by LaMetric icon number; the bridge
+// uploads it to the clock if the clock does not have it yet.
+function iconRow() {
+  p.iconImg = el("img", "icon-img");
+  p.iconImg.alt = "";
+  p.iconImg.onerror = () => { p.iconImg.hidden = true; };
+  p.iconImg.onload = () => { p.iconImg.hidden = false; };
+  const box = el("div", "icon-box");
+  box.append(p.iconImg);
+
+  p.iconInput = el("input", "field icon-field");
+  Object.assign(p.iconInput, { type: "text", inputMode: "numeric", placeholder: "none", maxLength: 7 });
+  p.iconInput.setAttribute("aria-label", "LaMetric icon number");
+  p.iconInput.oninput = () => {
+    p.iconInput.value = p.iconInput.value.replace(/\D/g, "");
+    p.iconEditing = true;
+    p.iconSave.hidden = false;
+    showIcon(p.iconInput.value);
+  };
+  p.iconSave = button("Save", () => busy(p.iconSave, async () => {
+    await api.setTimerIcon(p.iconInput.value);
+    p.iconEditing = false;
+    p.iconSave.hidden = true;
+    ui.toast(p.iconInput.value ? "Icon saved, it is on the clock" : "Icon removed");
+    ui.configChanged();
+  }), "btn primary");
+  p.iconSave.hidden = true;
+
+  const find = el("a", "hint", "Find icons ↗");
+  find.href = "https://developer.lametric.com/icons";
+  find.target = "_blank";
+  find.rel = "noopener";
+
+  const row = el("div", "form-row");
+  const grow = el("div", "grow");
+  grow.append(box, p.iconInput, p.iconSave);
+  row.append(el("label", null, "Icon"), grow);
+  const wrap = el("div", "icon-setting");
+  wrap.append(row, find);
+  return wrap;
+}
+
+function showIcon(id) {
+  p.iconImg.hidden = !id;
+  if (id) p.iconImg.src = "https://developer.lametric.com/content/apps/icon_thumbs/" + id;
 }
 
 // ---- render ----
@@ -260,8 +307,12 @@ export function render(s) {
     p.melody.value = t.melody;
   }
   const cur = choices.find(m => m.name === t.melody);
-  p.melodyText.textContent = t.melody === OFF ? "No sound at the end"
-    : "Sound at the end · " + (cur ? cur.label.split(":")[0] : t.melody);
+  p.melodyText.textContent = (t.melody === OFF ? "No sound" : "Sound: " + (cur ? cur.label.split(":")[0] : t.melody))
+    + " · " + (t.icon ? "Icon " + t.icon : "No icon");
+  if (!p.iconEditing && document.activeElement !== p.iconInput && p.iconInput.value !== (t.icon || "")) {
+    p.iconInput.value = t.icon || "";
+    showIcon(p.iconInput.value);
+  }
 }
 
 // clockText renders ms left like the clock: "4:05", "1:04:05".

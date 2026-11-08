@@ -96,7 +96,11 @@ pushes containing the private address. The local repo config already sets it.
   (`{"ok":false,"error":{...}}`). The bridge logs rejections and the UI
   lists them under Activity; probe a new key with `mosquitto_pub` to a
   scratch app before relying on it. `GET /api/v1/display/screen` on the
-  clock returns its 32×8 pixels, to check what it actually draws. `autoTransition` is off, so it
+  clock returns its 32×8 pixels, to check what it actually draws.
+- The clock draws only icons stored on it (`/ICONS/<id>.gif|jpg|png`,
+  listed by `GET /api/v1/files?dir=/ICONS`). The bridge learns the clock's
+  IP from the retained `awtrix/state/device` and uploads missing LaMetric
+  icons the config uses (PNGs converted to GIF), after every (re)start. `autoTransition` is off, so it
   stays on whatever app it is switched to. An app must be enabled in the
   clock's own loop (`/apploop.json`, `PUT /api/v1/apps/order`) or switching to
   it does nothing. The active app is reported on `awtrix/state/apps/active`.

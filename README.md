@@ -35,6 +35,12 @@ empty = none), so a running timer survives restarts and anything that can
 publish MQTT can start or cancel one. Options go under an optional
 top-level `timer:` (see `config.example.yaml`); no app may be named `timer`.
 
+Icons are LaMetric icon numbers. The clock only draws icons stored on it,
+so after every start the bridge uploads the ones the config uses that the
+clock lacks (it finds the clock's address on `device_topic`,
+`awtrix/state/device`), fetched from LaMetric. The timer's icon is picked
+in the admin UI.
+
 Apps whose entity is `unavailable`/`unknown` are removed from the clock
 (empty payload) until the value comes back. Any extra AWTRIX field
 (`duration`, `rainbow`, `pushIcon`, …) can be added under `extra:`.

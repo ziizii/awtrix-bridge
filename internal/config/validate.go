@@ -16,6 +16,7 @@ func (c *Config) applyDefaults() {
 	setDefault(&a.SwitchTopic, "awtrix/cmd/apps/switch")
 	setDefault(&a.ActiveTopic, "awtrix/state/apps/active")
 	setDefault(&a.ClockSettingsTopic, "awtrix/state/settings")
+	setDefault(&a.DeviceTopic, "awtrix/state/device")
 	setDefault(&a.ArmTopic, "awtrix-bridge/{name}/armed")
 	setDefault(&a.TimerTopic, "awtrix-bridge/timer")
 	if c.Timer == nil {

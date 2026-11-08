@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"sync"
 	"time"
 
@@ -35,6 +36,8 @@ type instance struct {
 	activeMu sync.Mutex
 	active   string          // app the clock reports on screen
 	clock    json.RawMessage // the clock's settings as it reports them
+	clockIP  string          // the clock's address, from its device state
+	iconSync sync.Once       // upload missing icons once the address is known
 }
 
 func start(parent context.Context, cfg *config.Config, prev []apps.App, log *slog.Logger) (*instance, error) {
@@ -118,6 +121,16 @@ func (i *instance) onConnect(c mqtt.Client) {
 		i.active = string(m.Payload())
 		i.activeMu.Unlock()
 	})
+	c.Subscribe(i.topics.Device, 0, func(_ mqtt.Client, m mqtt.Message) {
+		ip := awtrix.DeviceIP(m.Payload())
+		if ip == "" {
+			return
+		}
+		i.activeMu.Lock()
+		i.clockIP = ip
+		i.activeMu.Unlock()
+		i.iconSync.Do(func() { go i.syncIcons() })
+	})
 	c.Subscribe(i.topics.ClockSettings, 0, func(_ mqtt.Client, m mqtt.Message) {
 		if !json.Valid(m.Payload()) {
 			return
@@ -173,4 +186,58 @@ func (i *instance) removeDropped(next *config.Config) {
 			i.log.Warn("remove app failed", "app", a.Name, "err", err)
 		}
 	}
+}
+
+// clockHTTP is the clock's HTTP API, once its address is known.
+func (i *instance) clockHTTP() (awtrix.ClockHTTP, error) {
+	i.activeMu.Lock()
+	ip := i.clockIP
+	i.activeMu.Unlock()
+	if ip == "" {
+		return awtrix.ClockHTTP{}, errors.New("the clock has not reported its address yet")
+	}
+	return awtrix.ClockHTTP{Base: "http://" + ip, Client: &http.Client{Timeout: 15 * time.Second}}, nil
+}
+
+// syncIcons uploads the icons the config uses that the clock does not
+// have; the clock draws only stored icons and shows none otherwise.
+func (i *instance) syncIcons() {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	for _, id := range i.cfg.Icons() {
+		if id == "" {
+			continue
+		}
+		if err := i.ensureIcon(ctx, id); err != nil {
+			i.log.Warn("icon not on the clock", "icon", id, "err", err)
+		}
+	}
+}
+
+// ensureIcon makes sure the clock has a LaMetric icon, uploading it if
+// missing. Ids that are not LaMetric numbers are left alone (custom files).
+func (i *instance) ensureIcon(ctx context.Context, id string) error {
+	if !awtrix.IconID.MatchString(id) {
+		return nil
+	}
+	c, err := i.clockHTTP()
+	if err != nil {
+		return err
+	}
+	have, err := c.Icons(ctx)
+	if err != nil {
+		return err
+	}
+	if have[id] {
+		return nil
+	}
+	data, err := awtrix.FetchIcon(ctx, c.Client, id)
+	if err != nil {
+		return err
+	}
+	if err := c.UploadIcon(ctx, id, data); err != nil {
+		return err
+	}
+	i.log.Info("uploaded icon to the clock", "icon", id, "bytes", len(data))
+	return nil
 }

@@ -37,6 +37,7 @@ type Backend interface {
 	ExtendTimer(seconds int) error
 	CancelTimer() error
 	SetTimerMelody(ctx context.Context, melody string) error
+	SetTimerIcon(ctx context.Context, icon string) error
 	SetColor(ctx context.Context, target, app, key, value string) error
 }
 
@@ -98,6 +99,7 @@ func Handler(b Backend) http.Handler {
 	mux.Handle("POST /api/timer/extend", action(func(_ context.Context, r timerReq) error { return b.ExtendTimer(r.Seconds) }))
 	mux.Handle("POST /api/timer/cancel", action(func(_ context.Context, _ struct{}) error { return b.CancelTimer() }))
 	mux.Handle("POST /api/timer/melody", action(func(ctx context.Context, r melodyReq) error { return b.SetTimerMelody(ctx, r.Melody) }))
+	mux.Handle("POST /api/timer/icon", action(func(ctx context.Context, r struct{ Icon string }) error { return b.SetTimerIcon(ctx, r.Icon) }))
 	mux.Handle("POST /api/color", action(func(ctx context.Context, r colorReq) error {
 		return b.SetColor(ctx, r.Target, r.App, r.Key, r.Value)
 	}))

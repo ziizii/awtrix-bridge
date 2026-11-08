@@ -42,7 +42,10 @@ type Awtrix struct {
 	// ClockSettingsTopic is where the clock reports its own settings (time
 	// format, colors); the admin UI draws its preview with them.
 	ClockSettingsTopic string `yaml:"clock_settings_topic"`
-	ArmTopic           string `yaml:"arm_topic"` // retained on/off arm state of require_arm apps
+	// DeviceTopic is where the clock reports itself, including its IP
+	// address, which the bridge uses to upload missing icons.
+	DeviceTopic string `yaml:"device_topic"`
+	ArmTopic    string `yaml:"arm_topic"` // retained on/off arm state of require_arm apps
 	// TimerTopic holds the timer's retained state (JSON with start, end
 	// and the app to return to); anything can start a timer through it.
 	TimerTopic string `yaml:"timer_topic"`
@@ -138,6 +141,18 @@ type App struct {
 
 	// Extra fields merged verbatim into the AWTRIX payload (duration, rainbow, pushIcon, ...).
 	Extra map[string]any `yaml:"extra"`
+}
+
+// Icons lists the icon ids the config uses.
+func (c *Config) Icons() []string {
+	var out []string
+	for _, a := range c.Apps {
+		out = append(out, a.Icon, a.NightIcon)
+	}
+	if c.Timer != nil {
+		out = append(out, c.Timer.Icon)
+	}
+	return out
 }
 
 // AlertTune returns the countdown alert's RTTTL, or "" for no alert.

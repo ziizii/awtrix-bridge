@@ -34,6 +34,10 @@ func (f *fakeBackend) SetColor(_ context.Context, target, app, key, value string
 	f.timer = fmt.Sprintf("color %s %s %s %s", target, app, key, value)
 	return nil
 }
+func (f *fakeBackend) SetTimerIcon(_ context.Context, icon string) error {
+	f.timer = "icon " + icon
+	return nil
+}
 func (f *fakeBackend) CancelTimer() error { f.timer = "cancel"; return nil }
 func (f *fakeBackend) SetTimerMelody(_ context.Context, melody string) error {
 	f.timer = "melody " + melody
@@ -127,6 +131,7 @@ func TestAdmin(t *testing.T) {
 		`/api/timer {"at":"14:30"}`:        "start 0 14:30",
 		`/api/timer/extend {"seconds":60}`: "extend 60",
 		`/api/timer/cancel {}`:             "cancel",
+		`/api/timer/icon {"icon":"1820"}`:  "icon 1820",
 		`/api/color {"target":"app","app":"solar","key":"color","value":"#FFCC00"}`: "color app solar color #FFCC00",
 		`/api/timer/melody {"melody":"ding"}`:                                       "melody ding",
 	} {

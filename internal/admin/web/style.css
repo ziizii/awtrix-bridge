@@ -371,6 +371,12 @@ select.field {
 .btn.danger { color: var(--danger); }
 .btn.danger:hover { background: var(--danger-soft); }
 
+.icon-setting { display: grid; gap: 4px; }
+.icon-setting .hint { justify-self: end; color: var(--accent-text); text-decoration: none; font-weight: 600; }
+.icon-box { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 12px; background: var(--bezel); }
+.icon-img { width: 32px; height: 32px; image-rendering: pixelated; }
+.icon-field { width: 100px; flex: 1 1 auto; font-variant-numeric: tabular-nums; }
+
 /* ---- colors ---- */
 .screen-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .color-rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 2px 16px; margin-top: 10px; }

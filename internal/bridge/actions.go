@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/ziizii/awtrix-bridge/internal/awtrix"
@@ -186,4 +187,24 @@ func nextTimeOfDay(hhmm string, now time.Time) (time.Time, error) {
 		at = time.Date(y, m, d+1, t.Hour(), t.Minute(), 0, 0, now.Location())
 	}
 	return at, nil
+}
+
+// SetTimerIcon sets the timer's icon to a LaMetric icon id, uploading it
+// to the clock first if it is missing there; "" removes the icon.
+func (s *Supervisor) SetTimerIcon(ctx context.Context, id string) error {
+	inst, err := s.current()
+	if err != nil {
+		return err
+	}
+	if id != "" {
+		if !awtrix.IconID.MatchString(id) {
+			return fmt.Errorf("icon must be a LaMetric icon number, got %q", id)
+		}
+		if err := inst.ensureIcon(ctx, id); err != nil {
+			return fmt.Errorf("icon %s: %w", id, err)
+		}
+	}
+	return s.edit(ctx, func(raw []byte) ([]byte, error) {
+		return config.SetSection(raw, "timer", []config.Field{{Key: "icon", Value: strconv.Quote(id)}}), nil
+	})
 }

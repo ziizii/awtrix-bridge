@@ -56,8 +56,9 @@ export function render(s) {
   // Timer: a sample while running and after the end.
   rows(timerPart.rows, colors.timer, "timer", "", textColor);
   const t = Object.fromEntries(colors.timer.map(f => [f.key, value("timer", "", f) || textColor]));
-  timerPart.run.show({ text: "4:05", color: t.color, progress: 40, progressColor: t.progress_color, progressTrack: t.track_color });
-  timerPart.done.show({ text: "+0:12", color: t.done_color });
+  const ic = (s.timer && s.timer.icon) || undefined;
+  timerPart.run.show({ text: "4:05", icon: ic, color: t.color, progress: 40, progressColor: t.progress_color, progressTrack: t.track_color });
+  timerPart.done.show({ text: "+0:12", icon: ic, color: t.done_color });
 
   // Apps: the live payload, recolored while a picker is dragged.
   const live = new Map(clockApps(s).map(a => [a.app, a]));

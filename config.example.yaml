@@ -33,7 +33,7 @@ chime:                          # melody at every full hour; pick one in the adm
 
 timer:                          # optional: the timer started from the admin UI
   melody: beeps                 # played at the end; pick one in the admin UI, or off
-  # icon: "1820"
+  # icon: "1820"               # a LaMetric icon number; uploaded to the clock if missing
   # color: "#FFFFFF"            # text while running; done_color after the end
   # progress_color: "#FFFFFF"   # the bar on the bottom row (default: color)
   # track_color: "#303030"      # the bar's unfilled part
