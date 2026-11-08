@@ -18,12 +18,13 @@ import * as timer from "./sections/timer.js";
 import * as apps from "./sections/apps.js";
 import * as chime from "./sections/chime.js";
 import * as recent from "./sections/recent.js";
+import * as rejected from "./sections/rejected.js";
 import * as system from "./sections/system.js";
 import * as editor from "./sections/editor.js";
 
 export const views = [
   { id: "now", title: "Now", icon: "clock", sections: [hero, pickup, timer, apps] },
   { id: "sounds", title: "Sounds", icon: "bell", sections: [chime] },
-  { id: "activity", title: "Activity", icon: "activity", sections: [recent, system] },
+  { id: "activity", title: "Activity", icon: "activity", sections: [rejected, recent, system] },
   { id: "config", title: "Config", icon: "code", sections: [editor] },
 ];

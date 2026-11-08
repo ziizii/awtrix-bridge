@@ -20,6 +20,7 @@ type Status struct {
 	Countdowns []CountdownStatus  `json:"countdowns"`
 	Chime      ChimeStatus        `json:"chime"`
 	Timer      TimerStatus        `json:"timer"`
+	Rejected   []Rejection        `json:"rejected"` // commands the clock currently refuses
 	Melodies   []config.Melody    `json:"melodies"` // built-in tunes for chime and alerts
 }
 
@@ -61,7 +62,7 @@ type EntityStatus struct {
 func (s *Supervisor) Status() Status {
 	s.mu.Lock()
 	inst := s.cur
-	st := Status{Started: s.started, Loaded: s.loaded, Melodies: config.Melodies, Countdowns: []CountdownStatus{}}
+	st := Status{Started: s.started, Loaded: s.loaded, Melodies: config.Melodies, Countdowns: []CountdownStatus{}, Rejected: []Rejection{}}
 	s.mu.Unlock()
 	if inst == nil {
 		return st
@@ -69,6 +70,7 @@ func (s *Supervisor) Status() Status {
 	st.MQTT = inst.mqtt.IsConnectionOpen()
 	st.Active = inst.activeApp()
 	st.Clock = inst.clockSettings()
+	st.Rejected = inst.rejected.list()
 	st.Apps = inst.eng.Shown()
 	st.Recent = inst.eng.Recent()
 	st.Chime = inst.chimeStatus()

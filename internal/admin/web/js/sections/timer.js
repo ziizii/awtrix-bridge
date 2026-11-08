@@ -101,7 +101,7 @@ function untilPane() {
   p.atH = el("select", "field time-part");
   p.atM = el("select", "field time-part");
   setOptions(p.atH, Array.from({ length: 24 }, (_, i) => [two(i), two(i)]));
-  setOptions(p.atM, Array.from({ length: 60 }, (_, i) => [two(i), two(i)]));
+  setOptions(p.atM, Array.from({ length: 12 }, (_, i) => [two(i * 5), two(i * 5)])); // 5-minute steps
   p.atH.setAttribute("aria-label", "End hour");
   p.atM.setAttribute("aria-label", "End minute");
   p.atH.onchange = p.atM.onchange = () => { p.atSet = true; updateUntilHint(); };

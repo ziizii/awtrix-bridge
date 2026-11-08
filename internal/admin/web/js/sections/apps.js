@@ -17,6 +17,7 @@ export function mount() {
 
 export function render(s, ui) {
   // The timer has its own card; list it only while it runs.
+  const refused = new Map((s.rejected || []).map(r => [r.topic, r.reason]));
   const items = clockApps(s).filter(p => !p.frame.setting && !(p.app === "timer" && p.frame.off));
   keyed(grid, items, p => p.app, () => createTile(ui), (tile, p) => {
     const t = tile.parts;
@@ -25,9 +26,11 @@ export function render(s, ui) {
     t.matrix.show(p.frame);
     t.name.textContent = pretty(p.app);
     t.dot.hidden = !active;
-    t.sub.textContent = active ? "On screen" : p.frame.off ? "Hidden" : p.builtin ? "Built in" : "Updated " + ago(p.at);
+    const reason = refused.get(p.topic);
+    t.sub.textContent = reason ? "Rejected by the clock" : active ? "On screen" : p.frame.off ? "Hidden" : p.builtin ? "Built in" : "Updated " + ago(p.at);
+    tile.classList.toggle("refused", !!reason);
     tile.disabled = !(p.builtin || (p.pushed && !p.frame.off));
-    tile.title = p.builtin ? "Built into the clock" : p.topic;
+    tile.title = p.builtin ? "Built into the clock" : p.topic + (reason ? "\nRejected: " + reason : "");
     tile.classList.toggle("active", active);
     tile.classList.toggle("off", !!p.frame.off);
     if (active) tile.classList.remove("pending");

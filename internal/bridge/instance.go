@@ -30,6 +30,8 @@ type instance struct {
 	cancel context.CancelFunc
 	done   chan struct{}
 
+	rejected *rejections // commands the clock refused
+
 	activeMu sync.Mutex
 	active   string          // app the clock reports on screen
 	clock    json.RawMessage // the clock's settings as it reports them
@@ -49,7 +51,7 @@ func start(parent context.Context, cfg *config.Config, prev []apps.App, log *slo
 	ctx, cancel := context.WithCancel(parent)
 	i := &instance{
 		cfg: cfg, topics: awtrix.NewTopics(cfg.Awtrix), apps: list, log: log,
-		cancel: cancel, done: make(chan struct{}),
+		cancel: cancel, done: make(chan struct{}), rejected: newRejections(log),
 	}
 	i.mqtt = mqtt.NewClient(i.mqttOptions())
 	i.eng = engine.New(list, i, cfg.Awtrix.ResyncInterval.D(), log)
@@ -103,6 +105,12 @@ func (i *instance) onConnect(c mqtt.Client) {
 	if topic := i.eng.TimerTopic(); topic != "" {
 		c.Subscribe(topic, 1, func(_ mqtt.Client, m mqtt.Message) {
 			i.eng.SetTimer(awtrix.ParseTimer(m.Payload()))
+		})
+	}
+	// The clock answers every command on <topic>/result.
+	for _, topic := range i.topics.ResultTopics() {
+		c.Subscribe(topic, 0, func(_ mqtt.Client, m mqtt.Message) {
+			i.rejected.note(m.Topic(), m.Payload(), time.Now())
 		})
 	}
 	c.Subscribe(i.topics.Active, 0, func(_ mqtt.Client, m mqtt.Message) {

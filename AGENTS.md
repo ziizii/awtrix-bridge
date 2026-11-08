@@ -89,7 +89,13 @@ pushes containing the private address. The local repo config already sets it.
   `docker exec mac-main-teslamate-mosquitto-1 ...`.
 - Clock: awtrixng firmware at 192.168.11.199. It reports its settings (time
   format, colors, scrolling) retained on `awtrix/state/settings`; the bridge
-  passes them to the UI as `status.clock` for the LED preview. `autoTransition` is off, so it
+  passes them to the UI as `status.clock` for the LED preview.
+- The firmware is strict: it rejects a whole payload with any key it does
+  not know (e.g. it has `progress`/`progressColor`, not AWTRIX 3's
+  `progressC`/`progressBC`) and answers every command on `<topic>/result`
+  (`{"ok":false,"error":{...}}`). The bridge logs rejections and the UI
+  lists them under Activity; probe a new key with `mosquitto_pub` to a
+  scratch app before relying on it. `autoTransition` is off, so it
   stays on whatever app it is switched to. An app must be enabled in the
   clock's own loop (`/apploop.json`, `PUT /api/v1/apps/order`) or switching to
   it does nothing. The active app is reported on `awtrix/state/apps/active`.

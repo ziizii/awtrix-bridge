@@ -406,6 +406,10 @@ select.field {
 .event.sound .ev-ic { color: var(--night); background: var(--night-soft); }
 .event.arm .ev-ic { color: var(--accent-text); background: var(--accent-soft); }
 .event.switch .ev-ic { color: var(--ok); background: var(--ok-soft); }
+.event.bad .ev-ic { color: var(--danger); background: var(--danger-soft); }
+.event.bad .ev-detail { font-family: var(--mono); font-size: 12px; }
+.rejected { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); }
+.tile.refused .tile-sub { color: var(--danger); font-weight: 650; }
 .ev-main { flex: 1; min-width: 0; }
 .ev-title { font-weight: 600; font-size: 15px; }
 .ev-detail { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

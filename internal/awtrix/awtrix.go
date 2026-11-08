@@ -119,3 +119,52 @@ func ParseTimer(payload []byte) Timer {
 	}
 	return t
 }
+
+// ResultTopics are where the clock answers commands: each command topic
+// plus "/result", with "+" for the app name of pushed apps.
+func (t Topics) ResultTopics() []string {
+	out := []string{}
+	for _, c := range []string{t.Settings, t.Sound, t.Switch, t.App("+")} {
+		if c != "" {
+			out = append(out, c+"/result")
+		}
+	}
+	return out
+}
+
+// CommandOf returns the command topic a result topic answers.
+func CommandOf(resultTopic string) string { return strings.TrimSuffix(resultTopic, "/result") }
+
+// Result is the clock's answer to a command.
+type Result struct {
+	OK    bool `json:"ok"`
+	Error *struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+		Field   string `json:"field"`
+	} `json:"error"`
+}
+
+// Reason describes why the clock rejected a command.
+func (r Result) Reason() string {
+	if r.Error == nil {
+		return "rejected"
+	}
+	msg := r.Error.Message
+	if msg == "" {
+		msg = r.Error.Code
+	}
+	if r.Error.Field != "" && !strings.Contains(msg, r.Error.Field) {
+		msg += " (" + r.Error.Field + ")"
+	}
+	return msg
+}
+
+// ParseResult decodes a result; false if it is not one.
+func ParseResult(payload []byte) (Result, bool) {
+	var r Result
+	if json.Unmarshal(payload, &r) != nil {
+		return Result{}, false
+	}
+	return r, true
+}
