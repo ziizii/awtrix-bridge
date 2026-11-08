@@ -1,7 +1,7 @@
 services:
   awtrix-bridge:
-    image: ghcr.io/ziizii/awtrix-bridge:latest
-    # build: .   # uncomment to build locally from source instead
+    image: awtrix-bridge:local
+    build: .
     container_name: awtrix-bridge
     restart: unless-stopped
     # The admin UI writes config.yaml, so run as the user that owns it.

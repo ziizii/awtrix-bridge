@@ -53,19 +53,16 @@ The container must be able to write `config.yaml`: compose runs it as
 
 ## Run
 
-Every push to `main` builds `ghcr.io/ziizii/awtrix-bridge:latest` (amd64 + arm64)
-via GitHub Actions. On the server you only need three files:
+Deployed only on the `containers` host, built from this repo (no registry,
+no CI). See [AGENTS.md](AGENTS.md) for the deploy steps. First-time setup:
 
 ```bash
-mkdir -p ~/awtrix-bridge && cd ~/awtrix-bridge
-# copy docker-compose.yml, config.example.yaml -> config.yaml, .env.example -> .env
-docker login ghcr.io -u ziizii          # PAT with read:packages (repo is private)
-docker compose pull && docker compose up -d
+git clone git@github.com:ziizii/awtrix-bridge.git ~/repos/awtrix-bridge
+cd ~/repos/awtrix-bridge
+cp config.example.yaml config.yaml && cp .env.example .env   # fill in HA_TOKEN
+docker compose up -d --build
 docker compose logs -f
 ```
-
-Update later with `docker compose pull && docker compose up -d`.
-To build from source instead, clone the repo and use `build: .` in the compose file.
 
 Set `LOG_LEVEL=debug` to log every MQTT publish.
 
