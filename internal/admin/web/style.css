@@ -309,6 +309,7 @@ select.field {
 .pickup-state { font-size: 14px; color: var(--muted); }
 
 .disclose { border-top: 1px solid var(--line); margin: 0 -18px -18px; }
+.timer .disclose { margin-top: 0; }
 .disclose > summary {
   display: flex; align-items: center; gap: 10px; padding: 14px 18px; cursor: pointer; list-style: none;
   font-size: 14.5px; font-weight: 560; color: var(--ink-2);
@@ -322,6 +323,51 @@ select.field {
 .form-row > label { font-size: 15px; font-weight: 560; }
 .form-row .grow { display: flex; gap: 8px; align-items: center; flex: 1 1 220px; min-width: 0; }
 .form-row .grow select { flex: 1; }
+
+/* ---- timer ---- */
+.timer { display: grid; gap: 14px; }
+.timer .card-head { margin-bottom: 0; }
+.timer.running { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.timer.done { border-color: color-mix(in srgb, var(--danger) 55%, var(--line)); background: linear-gradient(180deg, var(--danger-soft), transparent 160px), var(--surface); }
+.timer-setup, .timer-pane { display: grid; gap: 14px; }
+
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 3px; border-radius: 13px; background: var(--surface-2); border: 1px solid var(--line); }
+.seg-btn {
+  appearance: none; min-height: 38px; border: 0; border-radius: 10px; cursor: pointer;
+  background: none; color: var(--muted); font-size: 14.5px; font-weight: 620; transition: background-color .15s, color .15s, box-shadow .15s;
+}
+.seg-btn[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+
+.presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.preset {
+  appearance: none; display: grid; justify-items: center; gap: 0; padding: 10px 4px 9px; cursor: pointer;
+  border-radius: 14px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
+  transition: transform .12s, border-color .15s, background-color .15s;
+}
+.preset:hover { border-color: var(--accent); background: var(--accent-soft); }
+.preset:active { transform: scale(.95); }
+.preset:disabled { opacity: .5; }
+.preset-n { font-size: 22px; font-weight: 720; letter-spacing: -.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.preset-u { font-size: 12px; font-weight: 600; color: var(--muted); }
+.timer .stepper input { width: 52px; }
+.timer-pane .form-row { flex-wrap: nowrap; }
+.timer-pane .form-row .grow { flex: 1 1 auto; }
+.unit { color: var(--muted); font-weight: 600; }
+.time-field { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; min-width: 120px; flex: none !important; }
+.until-hint { color: var(--muted); font-size: 14px; }
+
+.timer-run { display: grid; gap: 12px; }
+.timer-info { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 12px; flex-wrap: wrap; }
+.timer-left { font-size: 34px; font-weight: 760; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.timer.done .timer-left { color: var(--danger); animation: blink 1s steps(2, jump-none) infinite; }
+.timer-ends { color: var(--muted); font-size: 14px; }
+.timer-bar { height: 6px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.timer-fill { height: 100%; width: 0; border-radius: inherit; background: var(--accent); transition: width 1s linear; }
+.timer.done .timer-fill { background: var(--danger); }
+.timer-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.timer-actions .btn { flex: 1; }
+.btn.danger { color: var(--danger); }
+.btn.danger:hover { background: var(--danger-soft); }
 
 /* ---- chime ---- */
 .banner { display: flex; align-items: center; gap: 12px; padding: 12px; margin-bottom: 10px; border-radius: 16px; background: var(--surface-2); }

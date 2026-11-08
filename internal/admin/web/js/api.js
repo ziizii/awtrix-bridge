@@ -23,4 +23,9 @@ export const api = {
   playMelody: melody => call("POST", "/api/melody/play", { melody }),
   setChime: melody => call("POST", "/api/chime", { melody }),
   setAlert: (app, minutes, melody) => call("POST", "/api/alert", { app, minutes, melody }),
+  startTimer: seconds => call("POST", "/api/timer", { seconds }),
+  startTimerAt: at => call("POST", "/api/timer", { at }),
+  extendTimer: seconds => call("POST", "/api/timer/extend", { seconds }),
+  cancelTimer: () => call("POST", "/api/timer/cancel", {}),
+  setTimerMelody: melody => call("POST", "/api/timer/melody", { melody }),
 };

@@ -20,8 +20,14 @@ const ui = {
   // A setting was written to the config file: show it in the editor too.
   configChanged: () => { refreshIfClean(); ui.refresh(1200); },
   toast,
-  // badge marks a view's tab, e.g. for unsaved edits or something armed.
-  badge: (view, on) => { const l = links.get(view); if (l) l.badge.hidden = !on; },
+  // badge marks a view's tab, e.g. for unsaved edits or something armed;
+  // source tells apart sections that mark the same view.
+  badge: (view, on, source = view) => {
+    const l = links.get(view);
+    if (!l) return;
+    if (on) l.on.add(source); else l.on.delete(source);
+    l.badge.hidden = l.on.size === 0;
+  },
   go: view => { location.hash = "#/" + view; },
 };
 
@@ -33,7 +39,7 @@ function build() {
     badge.hidden = true;
     a.append(icon(v.icon), el("span", null, v.title), badge);
     $("nav").append(a);
-    links.set(v.id, { a, badge });
+    links.set(v.id, { a, badge, on: new Set() });
 
     const pane = el("section", "view");
     pane.hidden = true;

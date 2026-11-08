@@ -3,6 +3,7 @@ package config
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 const base = `homeassistant: {url: "http://ha", token: t}
@@ -77,5 +78,30 @@ func TestSetApp(t *testing.T) {
 	}
 	if _, err := SetApp([]byte(in), "nope", nil); err == nil {
 		t.Error("unknown app accepted")
+	}
+}
+
+func TestSetSectionTimer(t *testing.T) {
+	in := base + "chime:\n  melody: tick\n\napps: []\n"
+	out := string(SetSection([]byte(in), "timer", []Field{{"melody", "ding"}}, "rtttl"))
+	if !strings.Contains(out, "chime:\n  melody: tick\n\ntimer:\n  melody: ding\n\napps: []\n") {
+		t.Errorf("got:\n%s", out)
+	}
+	c, err := Parse([]byte(out))
+	if err != nil || c.Timer.Melody != "ding" {
+		t.Errorf("parse: %v %+v", err, c.Timer)
+	}
+}
+
+func TestTimerDefaults(t *testing.T) {
+	c, err := Parse([]byte(base))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Timer == nil || c.Timer.Melody != "beeps" || c.Timer.HoldAfter.D() != time.Minute || c.Awtrix.TimerTopic != "awtrix-bridge/timer" {
+		t.Errorf("defaults: %+v %q", c.Timer, c.Awtrix.TimerTopic)
+	}
+	if _, err := Parse([]byte(base + "apps:\n  - {name: timer, type: value, entity: x}\n")); err == nil {
+		t.Errorf("app named timer accepted")
 	}
 }

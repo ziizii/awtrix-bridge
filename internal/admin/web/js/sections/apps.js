@@ -16,7 +16,8 @@ export function mount() {
 }
 
 export function render(s, ui) {
-  const items = clockApps(s).filter(p => !p.frame.setting);
+  // The timer has its own card; list it only while it runs.
+  const items = clockApps(s).filter(p => !p.frame.setting && !(p.app === "timer" && p.frame.off));
   keyed(grid, items, p => p.app, () => createTile(ui), (tile, p) => {
     const t = tile.parts;
     const active = p.app === s.active;

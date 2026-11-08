@@ -19,6 +19,21 @@ type fakeBackend struct {
 	played   string
 	chime    string
 	alert    string
+	timer    string
+}
+
+func (f *fakeBackend) StartTimer(seconds int, at string) error {
+	f.timer = fmt.Sprintf("start %d %s", seconds, at)
+	return nil
+}
+func (f *fakeBackend) ExtendTimer(seconds int) error {
+	f.timer = fmt.Sprintf("extend %d", seconds)
+	return nil
+}
+func (f *fakeBackend) CancelTimer() error { f.timer = "cancel"; return nil }
+func (f *fakeBackend) SetTimerMelody(_ context.Context, melody string) error {
+	f.timer = "melody " + melody
+	return nil
 }
 
 func (f *fakeBackend) PlayMelody(name string) error { f.played = name; return nil }
@@ -102,5 +117,17 @@ func TestAdmin(t *testing.T) {
 	}
 	if w := do(h, "POST", "/api/alert", "application/json", `{"app":"bus333","minutes":7,"melody":"beeps"}`); w.Code != 200 || b.alert != "bus333 7 beeps" {
 		t.Errorf("set alert: %d %q", w.Code, b.alert)
+	}
+	for path, want := range map[string]string{
+		`/api/timer {"seconds":300}`:          "start 300 ",
+		`/api/timer {"at":"14:30"}`:           "start 0 14:30",
+		`/api/timer/extend {"seconds":60}`:    "extend 60",
+		`/api/timer/cancel {}`:                "cancel",
+		`/api/timer/melody {"melody":"ding"}`: "melody ding",
+	} {
+		p, body, _ := strings.Cut(path, " ")
+		if w := do(h, "POST", p, "application/json", body); w.Code != 200 || b.timer != want {
+			t.Errorf("%s: %d %q, want %q", path, w.Code, b.timer, want)
+		}
 	}
 }

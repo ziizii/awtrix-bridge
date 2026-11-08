@@ -19,6 +19,7 @@ type Status struct {
 	Recent     []engine.Published `json:"recent"`          // latest switches, sounds, arm changes
 	Countdowns []CountdownStatus  `json:"countdowns"`
 	Chime      ChimeStatus        `json:"chime"`
+	Timer      TimerStatus        `json:"timer"`
 	Melodies   []config.Melody    `json:"melodies"` // built-in tunes for chime and alerts
 }
 
@@ -29,6 +30,16 @@ type CountdownStatus struct {
 	Armed        bool   `json:"armed"`
 	AlertMinutes int    `json:"alert_minutes"` // 0 = no alert
 	AlertMelody  string `json:"alert_melody"`  // melody name, "off", or "custom"
+}
+
+// TimerStatus is the timer: whether it runs, from when to when, and the
+// melody it plays at the end.
+type TimerStatus struct {
+	Running   bool      `json:"running"`
+	Start     time.Time `json:"start"`
+	End       time.Time `json:"end"`
+	HoldAfter int       `json:"hold_after"` // seconds it counts up after the end
+	Melody    string    `json:"melody"`     // melody name, "off", or "custom"
 }
 
 // ChimeStatus is the hourly chime choice and what silences it.
@@ -61,6 +72,11 @@ func (s *Supervisor) Status() Status {
 	st.Apps = inst.eng.Shown()
 	st.Recent = inst.eng.Recent()
 	st.Chime = inst.chimeStatus()
+	t, tc := inst.eng.Timer(), inst.cfg.Timer
+	st.Timer = TimerStatus{
+		Running: t.Running(), Start: t.Start, End: t.End,
+		HoldAfter: int(tc.HoldAfter.D().Seconds()), Melody: melodyChoice(tc.Melody, tc.RTTTL),
+	}
 	for _, a := range inst.cfg.Apps {
 		if a.Type == config.TypeCountdown {
 			st.Countdowns = append(st.Countdowns, CountdownStatus{

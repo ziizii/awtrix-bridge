@@ -33,6 +33,10 @@ type Backend interface {
 	SetArmed(app string, on bool) error
 	SetChime(ctx context.Context, melody string) error
 	SetAlert(ctx context.Context, app string, minutes int, melody string) error
+	StartTimer(seconds int, at string) error
+	ExtendTimer(seconds int) error
+	CancelTimer() error
+	SetTimerMelody(ctx context.Context, melody string) error
 }
 
 // Request bodies.
@@ -48,6 +52,10 @@ type (
 		App     string
 		Minutes int
 		Melody  string
+	}
+	timerReq struct {
+		Seconds int
+		At      string // "14:30"
 	}
 )
 
@@ -79,6 +87,10 @@ func Handler(b Backend) http.Handler {
 	mux.Handle("POST /api/alert", action(func(ctx context.Context, r alertReq) error {
 		return b.SetAlert(ctx, r.App, r.Minutes, r.Melody)
 	}))
+	mux.Handle("POST /api/timer", action(func(_ context.Context, r timerReq) error { return b.StartTimer(r.Seconds, r.At) }))
+	mux.Handle("POST /api/timer/extend", action(func(_ context.Context, r timerReq) error { return b.ExtendTimer(r.Seconds) }))
+	mux.Handle("POST /api/timer/cancel", action(func(_ context.Context, _ struct{}) error { return b.CancelTimer() }))
+	mux.Handle("POST /api/timer/melody", action(func(ctx context.Context, r melodyReq) error { return b.SetTimerMelody(ctx, r.Melody) }))
 	return mux
 }
 

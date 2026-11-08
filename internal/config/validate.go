@@ -16,6 +16,19 @@ func (c *Config) applyDefaults() {
 	setDefault(&a.ActiveTopic, "awtrix/state/apps/active")
 	setDefault(&a.ClockSettingsTopic, "awtrix/state/settings")
 	setDefault(&a.ArmTopic, "awtrix-bridge/{name}/armed")
+	setDefault(&a.TimerTopic, "awtrix-bridge/timer")
+	if c.Timer == nil {
+		c.Timer = &Timer{}
+	}
+	t := c.Timer
+	if t.Melody == "" && t.RTTTL == "" {
+		t.Melody = "beeps"
+	}
+	setDefault(&t.Color, "#FFFFFF")
+	setDefault(&t.DoneColor, "#FF3B30")
+	if t.HoldAfter == 0 {
+		t.HoldAfter = Duration(time.Minute)
+	}
 	if a.ResyncInterval == 0 {
 		a.ResyncInterval = Duration(5 * time.Minute)
 	}
@@ -44,12 +57,18 @@ func (c *Config) validate() error {
 			return fmt.Errorf("chime.melody: %w", err)
 		}
 	}
-	seen := map[string]bool{}
+	if err := checkMelody(c.Timer.Melody); err != nil {
+		return fmt.Errorf("timer.melody: %w", err)
+	}
+	seen := map[string]bool{TimerApp: true}
 	for _, a := range c.Apps {
 		if a.Name == "" {
 			return errors.New("app without name")
 		}
 		if seen[a.Name] {
+			if a.Name == TimerApp {
+				return fmt.Errorf("app name %q is taken by the built-in timer", a.Name)
+			}
 			return fmt.Errorf("duplicate app name %q", a.Name)
 		}
 		seen[a.Name] = true

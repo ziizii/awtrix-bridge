@@ -15,6 +15,7 @@ type Config struct {
 	Awtrix        Awtrix        `yaml:"awtrix"`
 	Brightness    *Brightness   `yaml:"brightness"`
 	Chime         *Chime        `yaml:"chime"`
+	Timer         *Timer        `yaml:"timer"` // always set after Parse
 	Apps          []App         `yaml:"apps"`
 }
 
@@ -42,6 +43,9 @@ type Awtrix struct {
 	// format, colors); the admin UI draws its preview with them.
 	ClockSettingsTopic string `yaml:"clock_settings_topic"`
 	ArmTopic           string `yaml:"arm_topic"` // retained on/off arm state of require_arm apps
+	// TimerTopic holds the timer's retained state (JSON with start, end
+	// and the app to return to); anything can start a timer through it.
+	TimerTopic string `yaml:"timer_topic"`
 	// ResyncInterval re-publishes every app periodically so the clock recovers after a reboot.
 	ResyncInterval Duration `yaml:"resync_interval"`
 }
@@ -62,6 +66,25 @@ type Chime struct {
 
 // Tune returns the RTTTL to play, or "" when the chime is off.
 func (c Chime) Tune() string { return tune(c.Melody, c.RTTTL) }
+
+// TimerApp is the name of the timer's pushed app on the clock.
+const TimerApp = "timer"
+
+// Timer is the timer started from the admin UI: a duration or until a
+// time of day. While it runs the clock shows it; when it ends it plays a
+// melody, counts up for HoldAfter, then switches back.
+type Timer struct {
+	Icon       string   `yaml:"icon"`
+	Color      string   `yaml:"color"`       // while running
+	DoneColor  string   `yaml:"done_color"`  // after it ends
+	Melody     string   `yaml:"melody"`      // a Melodies name or "off"; default beeps
+	RTTTL      string   `yaml:"rtttl"`       // custom tune when Melody is empty
+	HoldAfter  Duration `yaml:"hold_after"`  // count up this long after it ends (default 1m)
+	SwitchBack string   `yaml:"switch_back"` // app to show afterwards; default: the one on screen when it started
+}
+
+// Tune returns the RTTTL to play when the timer ends, or "" for none.
+func (t Timer) Tune() string { return tune(t.Melody, t.RTTTL) }
 
 // Threshold selects a color: the first entry whose Below is greater than the
 // value wins; an entry without Below is the fallback.

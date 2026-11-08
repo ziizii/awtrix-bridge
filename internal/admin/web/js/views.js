@@ -14,6 +14,7 @@
 
 import * as hero from "./sections/hero.js";
 import * as pickup from "./sections/pickup.js";
+import * as timer from "./sections/timer.js";
 import * as apps from "./sections/apps.js";
 import * as chime from "./sections/chime.js";
 import * as recent from "./sections/recent.js";
@@ -21,7 +22,7 @@ import * as system from "./sections/system.js";
 import * as editor from "./sections/editor.js";
 
 export const views = [
-  { id: "now", title: "Now", icon: "clock", sections: [hero, pickup, apps] },
+  { id: "now", title: "Now", icon: "clock", sections: [hero, pickup, timer, apps] },
   { id: "sounds", title: "Sounds", icon: "bell", sections: [chime] },
   { id: "activity", title: "Activity", icon: "activity", sections: [recent, system] },
   { id: "config", title: "Config", icon: "code", sections: [editor] },

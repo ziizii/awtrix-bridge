@@ -30,7 +30,7 @@ func decode(t *testing.T, b []byte) map[string]any {
 
 var topics = awtrix.NewTopics(config.Awtrix{
 	AppTopic: "awtrix/cmd/apps/pushed/{name}", SettingsTopic: "s", SoundTopic: "snd",
-	SwitchTopic: "awtrix/cmd/apps/switch", ArmTopic: "awtrix-bridge/{name}/armed",
+	SwitchTopic: "awtrix/cmd/apps/switch", ArmTopic: "awtrix-bridge/{name}/armed", TimerTopic: "awtrix-bridge/timer",
 })
 
 func TestCarryKeepsSwitchState(t *testing.T) {

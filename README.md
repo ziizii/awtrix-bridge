@@ -23,6 +23,18 @@ its `quiet_entity` is on. Pick the melody (or off) in the admin UI, which
 previews each one on the clock; `melody:` names a built-in tune, or leave it
 empty and set a custom `rtttl:`.
 
+### Timer
+
+A built-in app named `timer`, started from the admin UI for a duration or
+until a time of day. It switches the clock to itself, counts down with a
+progress bar, plays its melody at the end, counts up blinking for
+`hold_after` (default `1m`), then switches back to the app that was on
+screen when it started. Its state is retained on `timer_topic`
+(`awtrix-bridge/timer`, JSON `{"start": ..., "end": ..., "back": ...}`,
+empty = none), so a running timer survives restarts and anything that can
+publish MQTT can start or cancel one. Options go under an optional
+top-level `timer:` (see `config.example.yaml`); no app may be named `timer`.
+
 Apps whose entity is `unavailable`/`unknown` are removed from the clock
 (empty payload) until the value comes back. Any extra AWTRIX field
 (`duration`, `rainbow`, `pushIcon`, …) can be added under `extra:`.
@@ -45,17 +57,18 @@ Only a bus arriving after the moment of arming disarms it.
 ## Admin UI
 
 With `ADMIN_ADDR` set (compose: `:8080`, published on host port `8095`) the
-bridge serves a small page:
+bridge serves a small page, built for phones first:
 
-- **Pickup**: arm/disarm `require_arm` countdowns and set their alert
-  (minutes before arrival and melody, with a preview on the clock).
-- **Hourly chime**: pick the melody or off, preview each one, see the quiet time.
-- **On the clock**: what each app currently shows; tap one (including the
-  built-in Time and Date) to switch the clock to it.
-- **Configuration**: a YAML editor. **Save & reload** validates the config,
+- **Now**: the clock's screen as an LED preview; pickup (arm/disarm
+  `require_arm` countdowns, set their alert); the timer (presets, custom
+  minutes or until a time; add time or cancel while it runs; its melody);
+  and every app with a preview; tap one (including the built-in Time and
+  Date) to switch the clock to it.
+- **Sounds**: the hourly chime melody or off, with previews and the quiet time.
+- **Activity**: recent switches, sounds and arming, and the bridge's status.
+- **Config**: a YAML editor. **Save** validates the config,
   writes `config.yaml` and restarts the pipeline in place; apps removed from
   the config are deleted from the clock.
-- **Recent switches & sounds**.
 
 Settings changed with the pickers are written into `config.yaml` as line
 edits, so comments and layout stay as they are. There is no

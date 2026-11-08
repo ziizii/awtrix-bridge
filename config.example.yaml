@@ -31,6 +31,13 @@ chime:                          # melody at every full hour; pick one in the adm
   # rtttl: "..."                # or a custom tune (used when melody is empty)
   quiet_entity: binary_sensor.heat_recovery_ventilation_quiet_time   # silent while on
 
+timer:                          # optional: the timer started from the admin UI
+  melody: beeps                 # played at the end; pick one in the admin UI, or off
+  # icon: "1820"
+  # color: "#FFFFFF"            # while running; done_color after the end
+  # hold_after: 1m              # counts up this long after the end
+  # switch_back: Time           # default: the app on screen when it started
+
 apps:
   - name: radon
     type: value

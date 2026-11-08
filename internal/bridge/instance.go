@@ -99,6 +99,12 @@ func (i *instance) onConnect(c mqtt.Client) {
 			i.eng.SetArmed(name, awtrix.IsArmed(m.Payload()))
 		})
 	}
+	// The retained timer state restores a running timer after a restart.
+	if topic := i.eng.TimerTopic(); topic != "" {
+		c.Subscribe(topic, 1, func(_ mqtt.Client, m mqtt.Message) {
+			i.eng.SetTimer(awtrix.ParseTimer(m.Payload()))
+		})
+	}
 	c.Subscribe(i.topics.Active, 0, func(_ mqtt.Client, m mqtt.Message) {
 		i.activeMu.Lock()
 		i.active = string(m.Payload())

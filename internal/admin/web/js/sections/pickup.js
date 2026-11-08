@@ -19,7 +19,7 @@ export function mount() {
 export function render(s, ui) {
   const rows = (s.countdowns || []).filter(c => c.require_arm);
   list.hidden = rows.length === 0;
-  ui.badge("now", rows.some(c => c.armed));
+  ui.badge("now", rows.some(c => c.armed), "pickup");
   const shown = new Map(clockApps(s).map(p => [p.app, p]));
   keyed(list, rows, c => c.app, c => createCard(c, ui), (root, c) => updateCard(root, c, s, shown));
 }

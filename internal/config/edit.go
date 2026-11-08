@@ -17,14 +17,20 @@ type Field struct{ Key, Value string }
 // SetChime sets keys of the top-level chime mapping, creating it before
 // "apps:" if missing. Keys in comment are commented out.
 func SetChime(raw []byte, fields []Field, comment ...string) []byte {
+	return SetSection(raw, "chime", fields, comment...)
+}
+
+// SetSection sets keys of a top-level mapping (chime, timer), creating it
+// before "apps:" if missing. Keys in comment are commented out.
+func SetSection(raw []byte, section string, fields []Field, comment ...string) []byte {
 	l := lines(strings.Split(string(raw), "\n"))
-	start := l.topLevel("chime")
+	start := l.topLevel(section)
 	if start < 0 {
 		at := l.topLevel("apps")
 		if at < 0 {
 			at = len(l)
 		}
-		l.insert(at, "chime:", "")
+		l.insert(at, section+":", "")
 		start = at
 	}
 	l.set(block{start: start, indent: 2}, fields, comment)

@@ -2,14 +2,16 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/ziizii/awtrix-bridge/internal/awtrix"
 	"github.com/ziizii/awtrix-bridge/internal/config"
 )
 
-// Actions the admin UI can take. Immediate effects (switch, play, arm) go
+// Actions the admin UI can take. Immediate effects (switch, play, arm, timer) go
 // straight to MQTT; settings (melodies, alert) are written to the config
 // file with a line edit and reloaded, so the file stays the source of
 // truth and keeps its comments.
@@ -88,4 +90,100 @@ func checkMelodyChoice(name string) error {
 		return fmt.Errorf("unknown melody %q", name)
 	}
 	return nil
+}
+
+// maxTimer is the longest timer the UI may start.
+const maxTimer = 24 * time.Hour
+
+// StartTimer starts the timer for a number of seconds, or until a time of
+// day ("14:30", the next one to come), replacing a running timer. The
+// state goes to the retained timer topic, like arming.
+func (s *Supervisor) StartTimer(seconds int, at string) error {
+	inst, err := s.current()
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	var end time.Time
+	switch {
+	case at != "" && seconds != 0:
+		return errors.New("give a duration or a time of day, not both")
+	case at != "":
+		if end, err = nextTimeOfDay(at, now); err != nil {
+			return err
+		}
+	case seconds > 0 && time.Duration(seconds)*time.Second <= maxTimer:
+		end = now.Add(time.Duration(seconds) * time.Second)
+	default:
+		return fmt.Errorf("timer must be 1s to %v, got %ds", maxTimer, seconds)
+	}
+	back := inst.activeApp()
+	if back == config.TimerApp {
+		back = inst.eng.Timer().Back // keep where the running timer returns to
+	}
+	return inst.setTimer(awtrix.Timer{Start: now, End: end, Back: back})
+}
+
+// ExtendTimer adds seconds to the running timer; one that already ended
+// restarts from now.
+func (s *Supervisor) ExtendTimer(seconds int) error {
+	inst, err := s.current()
+	if err != nil {
+		return err
+	}
+	t := inst.eng.Timer()
+	if !t.Running() {
+		return errors.New("no timer is running")
+	}
+	if seconds < 1 || time.Duration(seconds)*time.Second > maxTimer {
+		return fmt.Errorf("can add 1s to %v, got %ds", maxTimer, seconds)
+	}
+	now := time.Now()
+	if t.End.Before(now) {
+		t.Start, t.End = now, now
+	}
+	t.End = t.End.Add(time.Duration(seconds) * time.Second)
+	return inst.setTimer(t)
+}
+
+// CancelTimer stops the timer; the clock switches back.
+func (s *Supervisor) CancelTimer() error {
+	inst, err := s.current()
+	if err != nil {
+		return err
+	}
+	return inst.setTimer(awtrix.Timer{})
+}
+
+// SetTimerMelody selects the melody played when the timer ends, or "off".
+func (s *Supervisor) SetTimerMelody(ctx context.Context, melody string) error {
+	if err := checkMelodyChoice(melody); err != nil {
+		return err
+	}
+	return s.edit(ctx, func(raw []byte) ([]byte, error) {
+		return config.SetSection(raw, "timer", []config.Field{{Key: "melody", Value: melody}}, "rtttl"), nil
+	})
+}
+
+func (i *instance) setTimer(t awtrix.Timer) error {
+	topic := i.eng.TimerTopic()
+	if topic == "" {
+		return errors.New("no timer app")
+	}
+	return i.Publish(topic, awtrix.TimerPayload(t), true)
+}
+
+// nextTimeOfDay returns the next time the clock shows "15:04", today or
+// tomorrow.
+func nextTimeOfDay(hhmm string, now time.Time) (time.Time, error) {
+	t, err := time.Parse("15:04", hhmm)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("time of day must look like 14:30, got %q", hhmm)
+	}
+	y, m, d := now.Date()
+	at := time.Date(y, m, d, t.Hour(), t.Minute(), 0, 0, now.Location())
+	if !at.After(now) {
+		at = time.Date(y, m, d+1, t.Hour(), t.Minute(), 0, 0, now.Location())
+	}
+	return at, nil
 }

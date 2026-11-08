@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ziizii/awtrix-bridge/internal/apps"
+	"github.com/ziizii/awtrix-bridge/internal/awtrix"
 	"github.com/ziizii/awtrix-bridge/internal/ha"
 )
 
@@ -29,6 +30,7 @@ type status struct {
 	shown  map[string]Published // topic -> what the clock currently has
 	recent []Published          // latest events (switches, sounds), newest last
 	armed  map[string]bool      // armable app -> armed
+	timer  awtrix.Timer         // the timer app's state
 }
 
 func newStatus(list []apps.App) *status {
@@ -62,11 +64,15 @@ func (s *status) record(app string, m apps.Message, at time.Time) {
 	}
 }
 
-func (s *status) syncArmed(a apps.App) {
+// sync mirrors an app's arm and timer state after it changed.
+func (s *status) sync(a apps.App) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if ar, ok := a.(apps.Armable); ok && ar.ArmTopic() != "" {
-		s.mu.Lock()
 		s.armed[a.Name()] = ar.Armed()
-		s.mu.Unlock()
+	}
+	if t, ok := a.(apps.Timed); ok {
+		s.timer = t.Timer()
 	}
 }
 
@@ -108,4 +114,12 @@ func (e *Engine) Armed(app string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.armed[app]
+}
+
+// Timer returns the timer's state (zero when none runs).
+func (e *Engine) Timer() awtrix.Timer {
+	s := e.status
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.timer
 }

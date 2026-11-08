@@ -41,6 +41,7 @@ function describe(p) {
   if (p.payload === "on" || p.payload === "off") {
     return { kind: "arm", icon: "bus", title: (p.payload === "on" ? "Armed " : "Disarmed ") + pretty(p.app), detail: p.topic };
   }
+  if (p.app === "timer" && !p.payload) return { kind: "arm", icon: "timer", title: "Timer done", detail: p.topic };
   let j = {};
   try { j = JSON.parse(p.payload) || {}; } catch { /* not JSON */ }
   if (j.name) return { kind: "switch", icon: "swap", title: "Switched to " + pretty(j.name), detail: from };

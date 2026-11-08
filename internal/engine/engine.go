@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ziizii/awtrix-bridge/internal/apps"
+	"github.com/ziizii/awtrix-bridge/internal/awtrix"
 	"github.com/ziizii/awtrix-bridge/internal/ha"
 )
 
@@ -160,7 +161,7 @@ func (e *Engine) renderAll(now time.Time) {
 }
 
 func (e *Engine) render(a apps.App, now time.Time) {
-	defer e.status.syncArmed(a)
+	defer e.status.sync(a)
 	for _, m := range a.Render(e.states, now) {
 		if prev, seen := e.last[m.Topic]; seen && !m.Once && bytes.Equal(prev, m.Payload) {
 			continue // the clock already has it
@@ -196,10 +197,40 @@ func (e *Engine) SetArmed(name string, on bool) {
 			if e.ready {
 				e.render(a, now)
 			} else {
-				e.status.syncArmed(a)
+				e.status.sync(a)
 			}
 		}
 	})
+}
+
+// SetTimer applies the timer state read from its retained topic. Safe to
+// call from any goroutine.
+func (e *Engine) SetTimer(t awtrix.Timer) {
+	e.exec("timer", func(now time.Time) {
+		for _, a := range e.apps {
+			tm, ok := a.(apps.Timed)
+			if !ok {
+				continue
+			}
+			tm.SetTimer(t)
+			if e.ready {
+				e.render(a, now)
+			} else {
+				e.status.sync(a)
+			}
+		}
+	})
+}
+
+// TimerTopic is the timer's retained state topic, "" without a timer app.
+// It only reads configuration, so it is safe from any goroutine.
+func (e *Engine) TimerTopic() string {
+	for _, a := range e.apps {
+		if tm, ok := a.(apps.Timed); ok {
+			return tm.TimerTopic()
+		}
+	}
+	return ""
 }
 
 // ArmTopics maps each app that needs arming to its arm state topic. It

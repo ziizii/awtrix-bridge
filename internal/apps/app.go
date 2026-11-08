@@ -32,6 +32,14 @@ type Armable interface {
 	SetArmed(on bool, now time.Time)
 }
 
+// Timed is the timer app: its state comes from the retained timer topic.
+type Timed interface {
+	App
+	TimerTopic() string
+	Timer() awtrix.Timer
+	SetTimer(t awtrix.Timer)
+}
+
 // carrier apps keep runtime state (what already played, where the clock
 // was switched) across config reloads; see Carry.
 type carrier interface {
@@ -69,6 +77,9 @@ func Build(c *config.Config) ([]App, error) {
 	}
 	if ch := c.Chime; ch != nil && ch.Tune() != "" {
 		out = append(out, &chimeApp{cfg: *ch, tune: ch.Tune(), topic: t.Sound})
+	}
+	if c.Timer != nil {
+		out = append(out, &timerApp{cfg: *c.Timer, topics: t})
 	}
 	for _, a := range c.Apps {
 		switch a.Type {

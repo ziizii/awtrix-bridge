@@ -5,6 +5,7 @@ package awtrix
 import (
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/ziizii/awtrix-bridge/internal/config"
 )
@@ -20,6 +21,7 @@ type Topics struct {
 	Switch        string
 	Active        string // the clock reports the app on screen here
 	ClockSettings string // the clock reports its own settings here (JSON)
+	Timer         string // the bridge's retained timer state (JSON)
 	app           string // contains {name}
 	arm           string // contains {name}
 }
@@ -31,6 +33,7 @@ func NewTopics(c config.Awtrix) Topics {
 		Switch:        c.SwitchTopic,
 		Active:        c.ActiveTopic,
 		ClockSettings: c.ClockSettingsTopic,
+		Timer:         c.TimerTopic,
 		app:           c.AppTopic,
 		arm:           c.ArmTopic,
 	}
@@ -85,4 +88,34 @@ func IsArmed(payload []byte) bool { return string(payload) == "on" }
 func marshal(v any) []byte {
 	b, _ := json.Marshal(v)
 	return b
+}
+
+// Timer is the timer's state, kept retained on the timer topic so a
+// running timer survives restarts. The zero Timer means none.
+type Timer struct {
+	Start time.Time `json:"start"`
+	End   time.Time `json:"end"`
+	Back  string    `json:"back,omitempty"` // app to switch back to afterwards
+}
+
+func (t Timer) Running() bool { return !t.End.IsZero() }
+
+// TimerPayload encodes a timer; an empty payload clears the retained state.
+func TimerPayload(t Timer) []byte {
+	if !t.Running() {
+		return []byte{}
+	}
+	return marshal(t)
+}
+
+// ParseTimer decodes a timer state; anything unreadable means no timer.
+func ParseTimer(payload []byte) Timer {
+	var t Timer
+	if json.Unmarshal(payload, &t) != nil || t.End.IsZero() {
+		return Timer{}
+	}
+	if t.Start.IsZero() || t.Start.After(t.End) {
+		t.Start = t.End
+	}
+	return t
 }
