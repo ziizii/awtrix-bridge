@@ -49,6 +49,8 @@ type Awtrix struct {
 	AppTopic      string `yaml:"app_topic"`
 	SettingsTopic string `yaml:"settings_topic"`
 	SoundTopic    string `yaml:"sound_topic"`
+	// ArmTopic holds the retained on/off arm state of require_arm apps; "{name}" is replaced.
+	ArmTopic string `yaml:"arm_topic"`
 	// ResyncInterval re-publishes every app periodically so the clock recovers after a reboot.
 	ResyncInterval Duration `yaml:"resync_interval"`
 }
@@ -71,9 +73,9 @@ type App struct {
 	Type string `yaml:"type"` // value | surplus | countdown
 
 	// value / countdown
-	Entity string `yaml:"entity"`
-	Icon   string `yaml:"icon"`
-	Color  string `yaml:"color"`
+	Entity string      `yaml:"entity"`
+	Icon   string      `yaml:"icon"`
+	Color  string      `yaml:"color"`
 	Colors []Threshold `yaml:"colors"`
 
 	// value
@@ -81,18 +83,20 @@ type App struct {
 	Scale  float64 `yaml:"scale"`  // multiply the state before formatting (default 1)
 
 	// surplus
-	Production   string `yaml:"production"`
-	Consumption  string `yaml:"consumption"`
-	NightIcon    string `yaml:"night_icon"`    // icon when production is 0
+	Production    string `yaml:"production"`
+	Consumption   string `yaml:"consumption"`
+	NightIcon     string `yaml:"night_icon"` // icon when production is 0
 	PositiveColor string `yaml:"positive_color"`
 	NegativeColor string `yaml:"negative_color"`
 
 	// countdown: Colors thresholds are in minutes remaining.
-	ShowWithin  Duration `yaml:"show_within"`  // only show when arrival is within this window
-	HoldAfter   Duration `yaml:"hold_after"`   // keep "Now!" on screen this long after arrival
-	AlertAt     Duration `yaml:"alert_at"`     // play a sound once when remaining drops below this
-	AlertRTTTL  string   `yaml:"alert_rtttl"`
-	SwitchTo    bool     `yaml:"switch_to"`    // switch the clock to this app when it appears
+	ShowWithin Duration `yaml:"show_within"` // only show when arrival is within this window (0 = always)
+	HoldAfter  Duration `yaml:"hold_after"`  // count up ("+0:42") this long after arrival
+	AlertAt    Duration `yaml:"alert_at"`    // play a sound once when remaining drops below this
+	AlertRTTTL string   `yaml:"alert_rtttl"`
+	SwitchAt   Duration `yaml:"switch_at"`   // switch the clock to this app once when remaining drops below this (0 = never)
+	SwitchBack string   `yaml:"switch_back"` // app to switch back to when hold_after ends, e.g. "Time"
+	RequireArm bool     `yaml:"require_arm"` // hidden until armed (admin UI / arm_topic); disarms itself after the next arrival
 
 	// Extra fields merged verbatim into the AWTRIX payload (duration, rainbow, pushIcon, ...).
 	Extra map[string]any `yaml:"extra"`
@@ -104,9 +108,18 @@ func Load(path string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	c, err := Parse(raw)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	return c, nil
+}
+
+// Parse expands ${ENV} references in raw YAML and validates the result.
+func Parse(raw []byte) (*Config, error) {
 	var c Config
 	if err := yaml.Unmarshal([]byte(os.ExpandEnv(string(raw))), &c); err != nil {
-		return nil, fmt.Errorf("parse %s: %w", path, err)
+		return nil, err
 	}
 	c.applyDefaults()
 	return &c, c.validate()
@@ -124,6 +137,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Awtrix.SoundTopic == "" {
 		c.Awtrix.SoundTopic = "awtrix/cmd/audio/play"
+	}
+	if c.Awtrix.ArmTopic == "" {
+		c.Awtrix.ArmTopic = "awtrix-bridge/{name}/armed"
 	}
 	if c.Awtrix.ResyncInterval == 0 {
 		c.Awtrix.ResyncInterval = Duration(5 * time.Minute)

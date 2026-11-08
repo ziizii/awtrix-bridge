@@ -25,6 +25,7 @@ type Message struct {
 	Topic   string
 	Payload []byte
 	Once    bool
+	Retain  bool
 }
 
 type App interface {
@@ -36,14 +37,24 @@ type App interface {
 	Render(st States, now time.Time) []Message
 }
 
+// Armable apps stay hidden until armed and disarm themselves.
+type Armable interface {
+	App
+	ArmTopic() string // "" if the app does not need arming
+	Armed() bool
+	SetArmed(on bool, now time.Time)
+}
+
 type Topics struct {
 	App      string // contains {name}
 	Settings string
 	Sound    string
 	Switch   string
+	Arm      string // contains {name}
 }
 
 func (t Topics) app(name string) string { return strings.ReplaceAll(t.App, "{name}", name) }
+func (t Topics) arm(name string) string { return strings.ReplaceAll(t.Arm, "{name}", name) }
 
 // Build creates the apps described in the config.
 func Build(c *config.Config) ([]App, error) {
@@ -52,6 +63,7 @@ func Build(c *config.Config) ([]App, error) {
 		Settings: c.Awtrix.SettingsTopic,
 		Sound:    c.Awtrix.SoundTopic,
 		Switch:   switchTopic(c.Awtrix.AppTopic),
+		Arm:      c.Awtrix.ArmTopic,
 	}
 	var out []App
 	if b := c.Brightness; b != nil {
@@ -218,12 +230,16 @@ func or(s, def string) string {
 // ---- countdown ---------------------------------------------------------
 
 // countdownApp counts down to a timestamp entity (e.g. next bus arrival),
-// updating every second while the target is within ShowWithin.
+// updating every second, then counts up for HoldAfter once it arrives.
 type countdownApp struct {
-	cfg     config.App
-	topics  Topics
-	visible bool
-	alerted time.Time // target for which the alert already played
+	cfg      config.App
+	topics   Topics
+	bus      time.Time // latest arrival estimate of the bus being shown
+	alerted  time.Time // bus the alert already played for
+	switched time.Time // bus the clock was switched to, until it switches back
+	armed    bool      // require_arm: currently armed
+	armedAt  time.Time // when it was armed; only buses arriving later disarm it
+	pickup   time.Time // require_arm: the bus that arrived while armed
 }
 
 // sameTarget is how far a live arrival estimate may drift and still count
@@ -237,38 +253,41 @@ func (a *countdownApp) Ticking() bool      { return true }
 
 func (a *countdownApp) Render(st States, now time.Time) []Message {
 	topic := a.topics.app(a.cfg.Name)
-	s, ok := st.Get(a.cfg.Entity)
-	if !ok {
-		return a.hide(topic)
-	}
-	target, err := time.Parse(time.RFC3339, s.State)
-	if err != nil {
-		return a.hide(topic)
+	hold := a.cfg.HoldAfter.D()
+	msgs := append(a.switchBack(now, hold), a.autoDisarm(now, hold)...)
+
+	target := a.target(st, now, hold)
+	if target.IsZero() || (a.cfg.RequireArm && !a.armed) {
+		return append(msgs, remove(topic)...)
 	}
 	remaining := target.Sub(now)
-	if remaining < -a.cfg.HoldAfter.D() || (a.cfg.ShowWithin > 0 && remaining > a.cfg.ShowWithin.D()) {
-		return a.hide(topic)
+	if remaining < -hold || (a.cfg.ShowWithin > 0 && remaining > a.cfg.ShowWithin.D()) {
+		return append(msgs, remove(topic)...)
 	}
 
-	var text string
+	if sameBus(a.pickup, target) || (a.armed && remaining <= 0 && target.After(a.armedAt)) {
+		a.pickup = target
+	}
+
 	secs := int(math.Ceil(remaining.Seconds()))
+	text := fmt.Sprintf("%d:%02d", secs/60, secs%60)
 	if secs <= 0 {
-		text = "Now!"
-	} else {
-		text = fmt.Sprintf("%d:%02d", secs/60, secs%60)
+		text = fmt.Sprintf("+%d:%02d", -secs/60, -secs%60)
 	}
 	mins := float64(secs) / 60
-	msgs := []Message{{Topic: topic, Payload: payload(a.cfg.Icon, text, pickColor(mins, a.cfg.Color, a.cfg.Colors), a.cfg.Extra)}}
+	msgs = append(msgs, Message{Topic: topic, Payload: payload(a.cfg.Icon, text, pickColor(mins, a.cfg.Color, a.cfg.Colors), a.cfg.Extra)})
 
-	if !a.visible && a.cfg.SwitchTo && a.topics.Switch != "" {
+	if sameBus(a.switched, target) {
+		a.switched = target // follow the drifting estimate
+	} else if a.cfg.SwitchAt > 0 && a.topics.Switch != "" && remaining > 0 && remaining <= a.cfg.SwitchAt.D() {
+		a.switched = target
 		p, _ := json.Marshal(map[string]any{"name": a.cfg.Name, "fast": true})
-		// The switch must follow the first app payload so the app exists.
+		// The switch must follow the app payload so the app exists.
 		msgs = append(msgs, Message{Topic: a.topics.Switch, Payload: p, Once: true})
 	}
-	a.visible = true
 
 	if a.cfg.AlertAt > 0 && a.cfg.AlertRTTTL != "" && remaining > 0 &&
-		remaining <= a.cfg.AlertAt.D() && !a.alreadyAlerted(target) {
+		remaining <= a.cfg.AlertAt.D() && !sameBus(a.alerted, target) {
 		a.alerted = target
 		p, _ := json.Marshal(map[string]string{"rtttl": a.cfg.AlertRTTTL})
 		msgs = append(msgs, Message{Topic: a.topics.Sound, Payload: p, Once: true})
@@ -276,15 +295,92 @@ func (a *countdownApp) Render(st States, now time.Time) []Message {
 	return msgs
 }
 
-func (a *countdownApp) alreadyAlerted(target time.Time) bool {
-	if a.alerted.IsZero() {
+// target returns the arrival to show (zero if unknown). The feed moves on
+// to the next bus shortly after one arrives, so the bus that just arrived
+// is kept for hold to count up.
+func (a *countdownApp) target(st States, now time.Time, hold time.Duration) time.Time {
+	var t time.Time
+	if s, ok := st.Get(a.cfg.Entity); ok {
+		t, _ = time.Parse(time.RFC3339, s.State) // zero if unparsable
+	}
+	if !a.bus.IsZero() && !sameBus(a.bus, t) && !now.Before(a.bus) && now.Sub(a.bus) <= hold {
+		return a.bus
+	}
+	a.bus = t
+	return t
+}
+
+// switchBack returns the clock to SwitchBack once the bus it was switched
+// for has finished counting up.
+func (a *countdownApp) switchBack(now time.Time, hold time.Duration) []Message {
+	if a.switched.IsZero() || now.Sub(a.switched) <= hold {
+		return nil
+	}
+	a.switched = time.Time{}
+	if a.cfg.SwitchBack == "" || a.topics.Switch == "" {
+		return nil
+	}
+	p, _ := json.Marshal(map[string]any{"name": a.cfg.SwitchBack, "fast": true})
+	return []Message{{Topic: a.topics.Switch, Payload: p, Once: true}}
+}
+
+// autoDisarm disarms a require_arm app once the bus that arrived while it
+// was armed has finished counting up, and publishes the new state.
+func (a *countdownApp) autoDisarm(now time.Time, hold time.Duration) []Message {
+	if a.pickup.IsZero() || now.Sub(a.pickup) <= hold {
+		return nil
+	}
+	a.armed, a.pickup = false, time.Time{}
+	if a.ArmTopic() == "" {
+		return nil
+	}
+	return []Message{{Topic: a.ArmTopic(), Payload: []byte("off"), Once: true, Retain: true}}
+}
+
+func (a *countdownApp) ArmTopic() string {
+	if !a.cfg.RequireArm || a.topics.Arm == "" {
+		return ""
+	}
+	return a.topics.arm(a.cfg.Name)
+}
+
+func (a *countdownApp) Armed() bool { return a.armed }
+
+func (a *countdownApp) SetArmed(on bool, now time.Time) {
+	if on == a.armed {
+		return
+	}
+	a.armed, a.pickup = on, time.Time{}
+	if on {
+		a.armedAt = now
+	}
+}
+
+// sameBus reports whether target is the bus already handled at prev.
+func sameBus(prev, target time.Time) bool {
+	if prev.IsZero() || target.IsZero() {
 		return false
 	}
-	d := target.Sub(a.alerted)
+	d := target.Sub(prev)
 	return d > -sameTarget && d < sameTarget
 }
 
-func (a *countdownApp) hide(topic string) []Message {
-	a.visible = false
-	return remove(topic)
+// Carry copies per-bus state (alert played, clock switched, armed) from the apps
+// of a previous run to same-named apps of a new one, so a config reload
+// does not replay sounds or switches.
+func Carry(from, to []App) {
+	old := map[string]*countdownApp{}
+	for _, a := range from {
+		if c, ok := a.(*countdownApp); ok {
+			old[c.cfg.Name] = c
+		}
+	}
+	for _, a := range to {
+		if c, ok := a.(*countdownApp); ok {
+			if o := old[c.cfg.Name]; o != nil {
+				c.bus, c.alerted, c.switched = o.bus, o.alerted, o.switched
+				c.armed, c.armedAt, c.pickup = o.armed, o.armedAt, o.pickup
+			}
+		}
+	}
 }

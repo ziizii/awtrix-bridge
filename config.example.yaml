@@ -15,6 +15,7 @@ awtrix:
   app_topic: awtrix/cmd/apps/pushed/{name}
   settings_topic: awtrix/cmd/settings
   sound_topic: awtrix/cmd/audio/play
+  arm_topic: awtrix-bridge/{name}/armed   # retained on/off state of require_arm apps
   resync_interval: 5m     # re-push everything so the clock recovers after a reboot
 
 brightness:
@@ -74,11 +75,13 @@ apps:
     type: countdown
     entity: sensor.next_333_arrival
     icon: "11999"
-    show_within: 30m              # hidden otherwise
-    hold_after: 30s               # keep "Now!" briefly after arrival
+    require_arm: true             # hidden until armed in the admin UI; disarms itself after the bus arrives
+    show_within: 0s               # 0s = shown the whole time it is armed
+    hold_after: 2m                # count up "+0:42" for 2 minutes after arrival
     alert_at: 5m                  # beep once when 5 minutes remain
     alert_rtttl: "two:d=4,o=5,b=200:c,e"
-    switch_to: true               # jump to this app when it appears
+    switch_at: 10m                # jump to this app once when 10 minutes remain (0 = never)
+    switch_back: Time             # ...and back to the clock when hold_after ends
     colors:                       # thresholds in minutes remaining
       - { below: 2, color: "#FF2200" }
       - { below: 6, color: "#FFAA00" }

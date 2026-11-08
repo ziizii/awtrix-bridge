@@ -4,8 +4,13 @@ services:
     # build: .   # uncomment to build locally from source instead
     container_name: awtrix-bridge
     restart: unless-stopped
+    # The admin UI writes config.yaml, so run as the user that owns it.
+    user: "${PUID:-1000}:${PGID:-1000}"
     env_file: .env
     environment:
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      ADMIN_ADDR: ":8080"   # admin UI (no password - LAN only); remove to turn it off
+    ports:
+      - "${ADMIN_PORT:-8095}:8080"
     volumes:
-      - ./config.yaml:/config/config.yaml:ro
+      - ./config.yaml:/config/config.yaml

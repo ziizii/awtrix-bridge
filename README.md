@@ -15,11 +15,39 @@ Small Go service that pushes Home Assistant values to an AWTRIX clock over MQTT.
 |-------------|------------------------------------------------------------------------|
 | `value`     | one numeric sensor, `format` (Go fmt), fixed `color` or `colors` thresholds |
 | `surplus`   | `production - consumption` as `+1.2kW` / `-850W`, night icon when PV = 0 |
-| `countdown` | `m:ss` to a timestamp sensor, shown within `show_within`, optional beep at `alert_at` and auto-switch |
+| `countdown` | `m:ss` to a timestamp sensor, then counts up (`+0:42`) for `hold_after`. Shown within `show_within` (`0s` = always), beep at `alert_at`, switch the clock to it once at `switch_at` (`0` = never) and back to `switch_back` (e.g. `Time`) when the count-up ends. With `require_arm` it is hidden until armed and disarms itself after the next arrival. |
 
 Apps whose entity is `unavailable`/`unknown` are removed from the clock
 (empty payload) until the value comes back. Any extra AWTRIX field
 (`duration`, `rainbow`, `pushIcon`, …) can be added under `extra:`.
+
+### Arming (`require_arm`)
+
+For a countdown you only need sometimes (e.g. picking someone up from the
+bus). The arm state is a retained MQTT message on `arm_topic`
+(`awtrix-bridge/<app>/armed`, payload `on`/`off`), so it survives restarts.
+Arm it with the button in the admin UI, or from anything that can publish
+MQTT, e.g. an HA script:
+
+```yaml
+action: mqtt.publish
+data: {topic: awtrix-bridge/bus333/armed, payload: "on", retain: true}
+```
+
+Only a bus arriving after the moment of arming disarms it.
+
+## Admin UI
+
+With `ADMIN_ADDR` set (compose: `:8080`, published on host port `8095`) the
+bridge serves a small page: the arm button, what each app currently shows on
+the clock, recent switches/sounds, and a YAML editor. **Save & reload**
+validates the config, writes `config.yaml` and restarts the pipeline in
+place; apps removed from the config are deleted from the clock. There is no
+password, so keep it on the LAN. `${VAR}` references stay unexpanded in the
+editor, so secrets in `.env` are never shown.
+
+The container must be able to write `config.yaml`: compose runs it as
+`PUID:PGID` (default `1000:1000`), the owner of the file.
 
 ## Run
 
@@ -65,5 +93,5 @@ otherwise both will publish to the same topics.
 
 ```bash
 go test ./...
-go run . -config config.yaml
+go run . -config config.yaml -admin :8095
 ```

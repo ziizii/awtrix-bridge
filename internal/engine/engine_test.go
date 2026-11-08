@@ -13,7 +13,7 @@ import (
 
 type recorder struct{ msgs []string }
 
-func (r *recorder) Publish(topic string, p []byte) error {
+func (r *recorder) Publish(topic string, p []byte, _ bool) error {
 	r.msgs = append(r.msgs, topic+" "+string(p))
 	return nil
 }

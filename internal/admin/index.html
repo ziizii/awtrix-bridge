@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clock Admin</title>
+<style>
+:root {
+  --bg: #f4f4f1; --card: #ffffff; --ink: #1d1d1b; --muted: #6b6b66; --line: #e2e2dc;
+  --accent: #0b6e4f; --accent-ink: #ffffff; --danger: #b3261e; --warn: #9a6700;
+  --led: #111111; --code: #fafaf7;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161615; --card: #20201e; --ink: #ececea; --muted: #9a9a94; --line: #34342f;
+    --accent: #3fb68b; --accent-ink: #0d1f18; --danger: #f2827a; --warn: #e3b341;
+    --led: #000000; --code: #1a1a18;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 860px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font-size: 20px; margin: 0; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; }
+.meta { color: var(--muted); font-size: 13px; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--danger); margin-right: 6px; vertical-align: 1px; }
+.dot.on { background: var(--accent); }
+section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.arm { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.arm + .arm { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 14px; }
+.arm .name { font-weight: 600; font-size: 17px; }
+.arm .state { color: var(--muted); font-size: 13px; }
+.arm .state b { color: var(--accent); }
+button { font: inherit; border-radius: 8px; border: 1px solid var(--line); background: var(--card);
+  color: var(--ink); padding: 8px 14px; cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button:disabled { opacity: .5; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+button.big { padding: 12px 20px; font-size: 16px; min-width: 180px; }
+.apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.app { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.app .n { font-size: 12px; color: var(--muted); }
+.led { background: var(--led); color: #fff; border-radius: 4px; padding: 3px 8px; margin-top: 4px;
+  font: 600 16px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.led.off { color: #666; font-weight: 400; font-size: 13px; }
+textarea { width: 100%; min-height: 420px; resize: vertical; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--code); color: var(--ink); padding: 10px; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; tab-size: 2; }
+.bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+.msg { font-size: 13px; white-space: pre-wrap; }
+.msg.err { color: var(--danger); } .msg.ok { color: var(--accent); } .msg.warn { color: var(--warn); }
+ul.recent { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+ul.recent li { padding: 4px 0; border-top: 1px solid var(--line); display: flex; gap: 10px; }
+ul.recent li:first-child { border-top: 0; }
+ul.recent time { color: var(--muted); min-width: 64px; }
+code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.empty { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Clock admin</h1>
+    <div class="meta" id="meta">connecting…</div>
+  </header>
+
+  <section id="arms-section" hidden>
+    <h2>Pickup</h2>
+    <div id="arms"></div>
+  </section>
+
+  <section>
+    <h2>On the clock</h2>
+    <div class="apps" id="apps"><span class="empty">Waiting for data…</span></div>
+  </section>
+
+  <section>
+    <h2>Configuration</h2>
+    <textarea id="yaml" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+    <div class="bar">
+      <button class="primary" id="save">Save &amp; reload</button>
+      <button id="check">Check</button>
+      <button id="revert">Revert edits</button>
+      <button id="reload">Reload from file</button>
+      <span class="msg" id="msg"></span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Recent switches &amp; sounds</h2>
+    <ul class="recent" id="recent"><li class="empty">None yet.</li></ul>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let saved = "";
+
+async function api(method, path, body) {
+  const opt = { method, headers: {} };
+  if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
+  const r = await fetch(path, opt);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+function say(text, kind) { const m = $("msg"); m.textContent = text; m.className = "msg " + (kind || ""); }
+function dirty() { return $("yaml").value !== saved; }
+function ago(t) {
+  const s = Math.round((Date.now() - new Date(t)) / 1000);
+  if (s < 60) return s + "s ago";
+  if (s < 3600) return Math.round(s / 60) + "m ago";
+  if (s < 86400) return Math.round(s / 3600) + "h ago";
+  return new Date(t).toLocaleString();
+}
+function clock(t) { return new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }); }
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+function ledFor(p) {
+  const led = el("div", "led");
+  if (!p.payload) { led.classList.add("off"); led.textContent = "hidden"; return led; }
+  try {
+    const j = JSON.parse(p.payload);
+    if (j.text != null) { led.textContent = j.text; if (j.textColor) led.style.color = j.textColor; }
+    else if (j.brightness != null) { led.textContent = "☀ " + j.brightness; }
+    else led.textContent = p.payload;
+  } catch { led.textContent = p.payload; }
+  return led;
+}
+
+function renderStatus(s) {
+  $("meta").replaceChildren();
+  const dot = el("span", "dot" + (s.mqtt ? " on" : ""));
+  $("meta").append(dot, (s.mqtt ? "MQTT connected" : "MQTT disconnected") + " · config loaded " + ago(s.loaded));
+
+  const byApp = {};
+  (s.apps || []).forEach(p => { if (!byApp[p.app]) byApp[p.app] = p; });
+
+  const arms = s.arms || [];
+  $("arms-section").hidden = arms.length === 0;
+  $("arms").replaceChildren(...arms.map(a => {
+    const row = el("div", "arm");
+    const info = el("div");
+    info.append(el("div", "name", a.app));
+    const st = el("div", "state");
+    if (a.armed) { st.append(el("b", null, "Armed"), " · on the clock now, disarms itself after the bus arrives"); }
+    else st.textContent = "Off · hidden on the clock";
+    info.append(st);
+    const right = el("div");
+    right.style.display = "flex"; right.style.gap = "12px"; right.style.alignItems = "center";
+    if (a.armed && byApp[a.app]) right.append(ledFor(byApp[a.app]));
+    const btn = el("button", "big" + (a.armed ? "" : " primary"), a.armed ? "Disarm" : "Arm for next bus");
+    btn.onclick = async () => {
+      btn.disabled = true;
+      try { await api("POST", "/api/arm", { app: a.app, armed: !a.armed }); setTimeout(poll, 300); }
+      catch (e) { alert(e.message); btn.disabled = false; }
+    };
+    right.append(btn);
+    row.append(info, right);
+    return row;
+  }));
+
+  const apps = s.apps || [];
+  $("apps").replaceChildren(...(apps.length ? apps.map(p => {
+    const d = el("div", "app");
+    d.append(el("div", "n", p.app), ledFor(p));
+    d.title = p.topic + "\nupdated " + ago(p.at);
+    return d;
+  }) : [el("span", "empty", "Nothing published yet.")]));
+
+  const rec = (s.recent || []).slice().reverse();
+  $("recent").replaceChildren(...(rec.length ? rec.map(p => {
+    const li = el("li");
+    li.append(el("time", null, clock(p.at)), el("span", null, p.app), el("code", null, p.topic.split("/").pop() + " " + (p.payload || "")));
+    return li;
+  }) : [el("li", "empty", "None yet.")]));
+}
+
+async function poll() {
+  try { renderStatus(await api("GET", "/api/status")); }
+  catch (e) { $("meta").textContent = "bridge unreachable: " + e.message; }
+}
+
+async function loadConfig() {
+  const j = await api("GET", "/api/config");
+  saved = j.yaml; $("yaml").value = j.yaml;
+}
+
+$("check").onclick = async () => {
+  try { await api("POST", "/api/check", { yaml: $("yaml").value }); say("Config is valid.", "ok"); }
+  catch (e) { say(e.message, "err"); }
+};
+async function save() {
+  $("save").disabled = true; say("Saving…");
+  try {
+    await api("PUT", "/api/config", { yaml: $("yaml").value });
+    saved = $("yaml").value; say("Saved and reloaded.", "ok"); setTimeout(poll, 1500);
+  } catch (e) { say("Not saved: " + e.message, "err"); }
+  $("save").disabled = false;
+}
+$("save").onclick = save;
+$("revert").onclick = () => { $("yaml").value = saved; say(""); };
+$("reload").onclick = async () => {
+  if (dirty() && !confirm("Discard your edits and reload the file?")) return;
+  try { await api("POST", "/api/reload", {}); await loadConfig(); say("Reloaded from file.", "ok"); setTimeout(poll, 1500); }
+  catch (e) { say(e.message, "err"); }
+};
+$("yaml").addEventListener("input", () => say(dirty() ? "Unsaved changes" : "", dirty() ? "warn" : ""));
+$("yaml").addEventListener("keydown", e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); save(); }
+  if (e.key === "Tab") { e.preventDefault(); document.execCommand("insertText", false, "  "); }
+});
+window.addEventListener("beforeunload", e => { if (dirty()) e.preventDefault(); });
+
+loadConfig().catch(e => say(e.message, "err"));
+poll(); setInterval(poll, 1000);
+</script>
+</body>
+</html>
