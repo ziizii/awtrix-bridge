@@ -1,44 +1,58 @@
-// On the clock: what every app currently shows. Tapping one switches the
-// clock to it; the clock's built-in Time and Date are listed first.
+// Every app on the clock with a live preview. Tapping one switches the
+// clock to it; the clock's built-in Time and Date come first.
 
-import { $, el, keyed, ago, hhmm } from "../dom.js";
+import { el, card, keyed, ago, pretty } from "../dom.js";
 import { api } from "../api.js";
-import { led, setLed } from "../led.js";
+import { Matrix } from "../matrix.js";
+import { clockApps } from "../frames.js";
+
+let grid;
+
+export function mount() {
+  const c = card("Apps", "Tap one to show it on the clock");
+  grid = el("div", "tiles");
+  c.root.append(grid);
+  return c.root;
+}
 
 export function render(s, ui) {
-  const items = builtins().concat((s.apps || []).map(p => ({
-    ...p,
-    switchable: p.topic.includes("/pushed/") && !!p.payload, // a visible pushed app
-  })));
-  keyed($("apps"), items, p => p.app, () => createTile(ui), (tile, p) => {
-    tile.parts.item = p;
-    setLed(tile.parts.led, p.payload);
-    tile.parts.label.textContent = p.app;
-    tile.disabled = !p.switchable;
-    tile.classList.toggle("active", p.app === s.active);
-    tile.title = p.at ? p.topic + "\nupdated " + ago(p.at) : "clock built-in app";
+  const items = clockApps(s).filter(p => !p.frame.setting);
+  keyed(grid, items, p => p.app, () => createTile(ui), (tile, p) => {
+    const t = tile.parts;
+    const active = p.app === s.active;
+    t.item = p;
+    t.matrix.show(p.frame);
+    t.name.textContent = pretty(p.app);
+    t.dot.hidden = !active;
+    t.sub.textContent = active ? "On screen" : p.frame.off ? "Hidden" : p.builtin ? "Built in" : "Updated " + ago(p.at);
+    tile.disabled = !(p.builtin || (p.pushed && !p.frame.off));
+    tile.title = p.builtin ? "Built into the clock" : p.topic;
+    tile.classList.toggle("active", active);
+    tile.classList.toggle("off", !!p.frame.off);
+    if (active) tile.classList.remove("pending");
   });
 }
 
-// The clock draws these itself; the preview just mirrors the browser clock.
-function builtins() {
-  const now = new Date();
-  const text = t => JSON.stringify({ text: t });
-  return [
-    { app: "Time", payload: text(hhmm(now)), switchable: true },
-    { app: "Date", payload: text(now.toLocaleDateString([], { day: "numeric", month: "numeric" })), switchable: true },
-  ];
-}
-
 function createTile(ui) {
-  const tile = el("button", "app");
-  tile.parts = { label: el("div", "n"), led: led(), item: null };
-  tile.append(tile.parts.label, tile.parts.led);
+  const tile = el("button", "tile");
+  tile.type = "button";
+  const t = tile.parts = { matrix: new Matrix(), name: el("span"), dot: el("span", "live-dot"), sub: el("div", "tile-sub"), item: null };
+  const screen = el("div", "screen");
+  screen.append(t.matrix.el);
+  const nameRow = el("div", "tile-name");
+  nameRow.append(t.name, t.dot);
+  tile.append(screen, nameRow, t.sub);
   tile.onclick = async () => {
+    if (tile.classList.contains("active")) return;
+    tile.classList.add("pending");
+    setTimeout(() => tile.classList.remove("pending"), 4000);
     try {
-      await api.switchTo(tile.parts.item.app);
+      await api.switchTo(t.item.app);
       ui.refresh(400);
-    } catch (e) { alert(e.message); }
+    } catch (e) {
+      tile.classList.remove("pending");
+      ui.toast(e.message, "err");
+    }
   };
   return tile;
 }

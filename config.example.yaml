@@ -17,6 +17,7 @@ awtrix:
   sound_topic: awtrix/cmd/audio/play
   switch_topic: awtrix/cmd/apps/switch
   active_topic: awtrix/state/apps/active  # the clock reports the app on screen here
+  clock_settings_topic: awtrix/state/settings  # the clock reports its settings here
   arm_topic: awtrix-bridge/{name}/armed   # retained on/off state of require_arm apps
   resync_interval: 5m     # re-push everything so the clock recovers after a reboot
 

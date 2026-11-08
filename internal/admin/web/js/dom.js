@@ -1,5 +1,7 @@
 // Small DOM helpers shared by the sections.
 
+import { toast } from "./toast.js";
+
 export const $ = id => document.getElementById(id);
 
 // el creates an element with an optional class and text.
@@ -10,10 +12,26 @@ export function el(tag, cls, text) {
   return e;
 }
 
-export function button(text, onclick, cls) {
+export function button(text, onclick, cls = "btn") {
   const b = el("button", cls, text);
+  b.type = "button";
   b.onclick = onclick;
   return b;
+}
+
+// card builds a section card with a title and an optional subtitle;
+// head holds the title block and anything added to its right.
+export function card(title, sub) {
+  const root = el("div", "card");
+  const head = el("div", "card-head");
+  const text = el("div");
+  text.append(el("h2", "card-title", title));
+  const subEl = el("div", "card-sub", sub);
+  subEl.hidden = sub == null;
+  text.append(subEl);
+  head.append(text);
+  root.append(head);
+  return { root, head, sub: subEl };
 }
 
 // keyed keeps one element per key inside parent, in the order of items:
@@ -50,12 +68,18 @@ export function setOptions(select, pairs) {
 // Run an action from a button: disable it meanwhile, report errors.
 export async function busy(btn, fn) {
   btn.disabled = true;
-  try { await fn(); } catch (e) { alert(e.message); }
+  try { await fn(); } catch (e) { toast(e.message, "err"); }
   btn.disabled = false;
 }
 
+// pretty turns a config name into a label: "temp_out" -> "Temp out".
+export const pretty = name => {
+  const s = String(name || "").replace(/[_-]+/g, " ").trim();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+};
+
 export function ago(t) {
-  const s = Math.round((Date.now() - new Date(t)) / 1000);
+  const s = Math.max(0, Math.round((Date.now() - new Date(t)) / 1000));
   if (s < 60) return s + "s ago";
   if (s < 3600) return Math.round(s / 60) + "m ago";
   if (s < 86400) return Math.round(s / 3600) + "h ago";

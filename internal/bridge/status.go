@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/ziizii/awtrix-bridge/internal/config"
@@ -10,11 +11,12 @@ import (
 // Status is everything the admin UI shows; it is polled every second.
 type Status struct {
 	Started    time.Time          `json:"started"`
-	Loaded     time.Time          `json:"loaded"` // last config (re)load
-	MQTT       bool               `json:"mqtt"`   // connected to the broker
-	Active     string             `json:"active"` // app on screen, as the clock reports it
-	Apps       []engine.Published `json:"apps"`   // what the clock currently has
-	Recent     []engine.Published `json:"recent"` // latest switches, sounds, arm changes
+	Loaded     time.Time          `json:"loaded"`          // last config (re)load
+	MQTT       bool               `json:"mqtt"`            // connected to the broker
+	Active     string             `json:"active"`          // app on screen, as the clock reports it
+	Clock      json.RawMessage    `json:"clock,omitempty"` // the clock's own settings, as it reports them
+	Apps       []engine.Published `json:"apps"`            // what the clock currently has
+	Recent     []engine.Published `json:"recent"`          // latest switches, sounds, arm changes
 	Countdowns []CountdownStatus  `json:"countdowns"`
 	Chime      ChimeStatus        `json:"chime"`
 	Melodies   []config.Melody    `json:"melodies"` // built-in tunes for chime and alerts
@@ -55,6 +57,7 @@ func (s *Supervisor) Status() Status {
 	}
 	st.MQTT = inst.mqtt.IsConnectionOpen()
 	st.Active = inst.activeApp()
+	st.Clock = inst.clockSettings()
 	st.Apps = inst.eng.Shown()
 	st.Recent = inst.eng.Recent()
 	st.Chime = inst.chimeStatus()

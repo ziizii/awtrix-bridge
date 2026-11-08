@@ -15,22 +15,24 @@ var BuiltinApps = []string{"Time", "Date"}
 
 // Topics are the MQTT topics of one clock (and of the bridge's own state).
 type Topics struct {
-	Settings string
-	Sound    string
-	Switch   string
-	Active   string // the clock reports the app on screen here
-	app      string // contains {name}
-	arm      string // contains {name}
+	Settings      string
+	Sound         string
+	Switch        string
+	Active        string // the clock reports the app on screen here
+	ClockSettings string // the clock reports its own settings here (JSON)
+	app           string // contains {name}
+	arm           string // contains {name}
 }
 
 func NewTopics(c config.Awtrix) Topics {
 	return Topics{
-		Settings: c.SettingsTopic,
-		Sound:    c.SoundTopic,
-		Switch:   c.SwitchTopic,
-		Active:   c.ActiveTopic,
-		app:      c.AppTopic,
-		arm:      c.ArmTopic,
+		Settings:      c.SettingsTopic,
+		Sound:         c.SoundTopic,
+		Switch:        c.SwitchTopic,
+		Active:        c.ActiveTopic,
+		ClockSettings: c.ClockSettingsTopic,
+		app:           c.AppTopic,
+		arm:           c.ArmTopic,
 	}
 }
 

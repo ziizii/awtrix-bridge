@@ -2,50 +2,32 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Clock Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f3f2ee" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e0e0d" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Clock">
+<title>Clock</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 <script type="module" src="js/main.js"></script>
 </head>
 <body>
-<main>
-  <header>
-    <h1>Clock admin</h1>
-    <div class="meta" id="meta">connecting…</div>
-  </header>
-
-  <section id="pickup" hidden>
-    <h2>Pickup</h2>
-    <div id="pickup-rows"></div>
-  </section>
-
-  <section id="chime" hidden>
-    <h2>Hourly chime</h2>
-    <p class="note" id="chime-quiet"></p>
-    <div id="chime-rows"></div>
-  </section>
-
-  <section>
-    <h2>On the clock <small>· tap to show it</small></h2>
-    <div class="apps" id="apps"><span class="empty">Waiting for data…</span></div>
-  </section>
-
-  <section>
-    <h2>Configuration</h2>
-    <textarea id="yaml" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-    <div class="bar">
-      <button class="primary" id="save">Save &amp; reload</button>
-      <button id="check">Check</button>
-      <button id="revert">Revert edits</button>
-      <button id="reload">Reload from file</button>
-      <span class="msg" id="msg"></span>
-    </div>
-  </section>
-
-  <section>
-    <h2>Recent switches &amp; sounds</h2>
-    <ul class="recent" id="recent"><li class="empty">None yet.</li></ul>
-  </section>
-</main>
+<!-- The page is built by js/main.js from the views in js/views.js. -->
+<div class="shell">
+  <aside class="side">
+    <header class="topbar">
+      <a class="brand" href="#/">
+        <img class="mark" src="icon.svg" alt="" width="28" height="28">
+        <span>Clock</span>
+      </a>
+      <div class="conn" id="conn"><span class="dot"></span><span class="conn-text">Connecting…</span></div>
+    </header>
+    <nav class="nav" id="nav" aria-label="Sections"></nav>
+  </aside>
+  <main class="views" id="views"></main>
+</div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
 </body>
 </html>

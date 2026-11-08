@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -30,7 +31,8 @@ type instance struct {
 	done   chan struct{}
 
 	activeMu sync.Mutex
-	active   string // app the clock reports on screen
+	active   string          // app the clock reports on screen
+	clock    json.RawMessage // the clock's settings as it reports them
 }
 
 func start(parent context.Context, cfg *config.Config, prev []apps.App, log *slog.Logger) (*instance, error) {
@@ -102,6 +104,14 @@ func (i *instance) onConnect(c mqtt.Client) {
 		i.active = string(m.Payload())
 		i.activeMu.Unlock()
 	})
+	c.Subscribe(i.topics.ClockSettings, 0, func(_ mqtt.Client, m mqtt.Message) {
+		if !json.Valid(m.Payload()) {
+			return
+		}
+		i.activeMu.Lock()
+		i.clock = append(json.RawMessage{}, m.Payload()...)
+		i.activeMu.Unlock()
+	})
 	i.eng.ForceResync()
 }
 
@@ -109,6 +119,12 @@ func (i *instance) activeApp() string {
 	i.activeMu.Lock()
 	defer i.activeMu.Unlock()
 	return i.active
+}
+
+func (i *instance) clockSettings() json.RawMessage {
+	i.activeMu.Lock()
+	defer i.activeMu.Unlock()
+	return i.clock
 }
 
 // Publish implements engine.Publisher.

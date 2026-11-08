@@ -38,7 +38,10 @@ type Awtrix struct {
 	SoundTopic    string `yaml:"sound_topic"`
 	SwitchTopic   string `yaml:"switch_topic"`
 	ActiveTopic   string `yaml:"active_topic"` // where the clock reports the app on screen
-	ArmTopic      string `yaml:"arm_topic"`    // retained on/off arm state of require_arm apps
+	// ClockSettingsTopic is where the clock reports its own settings (time
+	// format, colors); the admin UI draws its preview with them.
+	ClockSettingsTopic string `yaml:"clock_settings_topic"`
+	ArmTopic           string `yaml:"arm_topic"` // retained on/off arm state of require_arm apps
 	// ResyncInterval re-publishes every app periodically so the clock recovers after a reboot.
 	ResyncInterval Duration `yaml:"resync_interval"`
 }

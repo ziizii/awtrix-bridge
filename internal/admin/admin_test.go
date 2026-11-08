@@ -72,7 +72,7 @@ func TestAdmin(t *testing.T) {
 	b := &fakeBackend{armed: map[string]bool{}}
 	h := Handler(b)
 
-	if w := do(h, "GET", "/", "", ""); w.Code != 200 || !strings.Contains(w.Body.String(), "<title>Clock Admin</title>") {
+	if w := do(h, "GET", "/", "", ""); w.Code != 200 || !strings.Contains(w.Body.String(), `src="js/main.js"`) {
 		t.Errorf("index: %d", w.Code)
 	}
 	// A cross-site form post (no JSON content type) must be rejected.

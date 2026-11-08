@@ -33,7 +33,7 @@ Data flows HA WebSocket -> engine -> apps -> MQTT -> clock. Packages under
 | `engine` | Single goroutine that owns all app state: routes HA states, ticks every second, dedupes and publishes. `status.go` mirrors state for other goroutines. |
 | `ha`     | Minimal HA WebSocket client (state snapshot + `state_changed`). |
 | `bridge` | `Supervisor` owns the config file and the running `instance` (MQTT + HA + engine) and swaps it on reload. `actions.go` = what the UI can do, `status.go` = what it shows. |
-| `admin`  | HTTP API (`admin.go`, one generic `action` handler) and the page in `web/` (plain ES modules, one per section in `web/js/sections/`). |
+| `admin`  | HTTP API (`admin.go`, one generic `action` handler) and the page in `web/` (plain ES modules: views in `web/js/views.js`, one module per section in `web/js/sections/`, the LED preview in `matrix.js`/`frames.js`). |
 
 Common changes:
 
@@ -45,6 +45,11 @@ Common changes:
   effect, or a config edit via `s.edit` + `config.SetApp`/`SetChime`), the
   method in `admin.Backend`, one route line in `admin.Handler`, a call in
   `web/js/api.js`, and the UI in a section module.
+- **New admin UI section or page**: a module in `web/js/sections/` exporting
+  `mount(ui)` (returns its element, built once) and `render(status, ui)`,
+  listed in a view in `web/js/views.js`; a new view gets its own tab. Style
+  it with the tokens and components in `style.css` (`card`, `btn`, `chip`,
+  `field`), which have light and dark values.
 - **Changing app state from outside** (MQTT handler, UI): go through
   `engine.exec`, never touch apps from another goroutine.
 - **Admin UI sections** re-render every second: build elements once and update
@@ -74,7 +79,9 @@ pushes containing the private address. The local repo config already sets it.
 - MQTT broker: TeslaMate mosquitto on containers (`192.168.11.239:1883`,
   anonymous). `mosquitto_sub`/`mosquitto_pub` via
   `docker exec mac-main-teslamate-mosquitto-1 ...`.
-- Clock: awtrixng firmware at 192.168.11.199. `autoTransition` is off, so it
+- Clock: awtrixng firmware at 192.168.11.199. It reports its settings (time
+  format, colors, scrolling) retained on `awtrix/state/settings`; the bridge
+  passes them to the UI as `status.clock` for the LED preview. `autoTransition` is off, so it
   stays on whatever app it is switched to. An app must be enabled in the
   clock's own loop (`/apploop.json`, `PUT /api/v1/apps/order`) or switching to
   it does nothing. The active app is reported on `awtrix/state/apps/active`.

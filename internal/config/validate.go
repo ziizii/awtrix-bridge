@@ -14,6 +14,7 @@ func (c *Config) applyDefaults() {
 	setDefault(&a.SoundTopic, "awtrix/cmd/audio/play")
 	setDefault(&a.SwitchTopic, "awtrix/cmd/apps/switch")
 	setDefault(&a.ActiveTopic, "awtrix/state/apps/active")
+	setDefault(&a.ClockSettingsTopic, "awtrix/state/settings")
 	setDefault(&a.ArmTopic, "awtrix-bridge/{name}/armed")
 	if a.ResyncInterval == 0 {
 		a.ResyncInterval = Duration(5 * time.Minute)
