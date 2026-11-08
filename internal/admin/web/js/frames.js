@@ -101,6 +101,7 @@ export function frameOf(payload, clock = {}) {
   if (j.progress != null && j.progress >= 0) {
     f.progress = Number(j.progress);
     f.progressColor = color(j.progressColor ?? j.progressC);
+    f.progressTrack = color(j.progressTrackColor ?? j.progressBC) || "#ffffff"; // the clock's default
   }
   return f;
 }

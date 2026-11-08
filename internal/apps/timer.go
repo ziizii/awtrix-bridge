@@ -30,6 +30,10 @@ type timerState struct {
 // A timer seen after a restart does not switch the clock again once it
 // is older than timerFresh, and does not ring once it ended more than
 // timerLate ago.
+// timerTrack is the unfilled part of the progress bar: dim, so the
+// filled part shows in any color.
+const timerTrack = "#303030"
+
 const (
 	timerFresh = 10 * time.Second
 	timerLate  = time.Minute
@@ -88,10 +92,11 @@ func (a *timerApp) payload(t awtrix.Timer, now time.Time) []byte {
 	extra := map[string]any{}
 	if total := t.End.Sub(t.Start); total > 0 {
 		p := int(100 * now.Sub(t.Start) / total)
-		// awtrixng rejects a whole payload with unknown keys, and knows
-		// only these two progress keys.
+		// awtrixng's progress keys (it rejects a payload with unknown
+		// ones). The track is white unless set, which hides a white bar.
 		extra["progress"] = min(100, max(0, p))
 		extra["progressColor"] = a.cfg.Color
+		extra["progressTrackColor"] = timerTrack
 	}
 	return awtrix.AppPayload(a.cfg.Icon, timerText(secs), a.cfg.Color, extra)
 }

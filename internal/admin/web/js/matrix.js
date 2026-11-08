@@ -186,7 +186,7 @@ function compose(f, elapsed) {
     });
   } else if (f.progress != null) {
     const n = Math.round((Math.min(100, Math.max(0, f.progress)) / 100) * area);
-    for (let i = 0; i < area; i++) set(x0 + i, 7, i < n ? f.progressColor || "#38d9a9" : DIM);
+    for (let i = 0; i < area; i++) set(x0 + i, 7, i < n ? f.progressColor || "#ffffff" : f.progressTrack || DIM);
   }
   return { px, scrolls };
 }
