@@ -27,7 +27,7 @@ empty and set a custom `rtttl:`.
 
 A built-in app named `timer`, started from the admin UI for a duration or
 until a time of day. It switches the clock to itself, counts down with a
-progress bar, plays its melody at the end, counts up blinking for
+progress bar, plays its melody at the end, counts up in red for
 `hold_after` (default `1m`), then switches back to the app that was on
 screen when it started. Its state is retained on `timer_topic`
 (`awtrix-bridge/timer`, JSON `{"start": ..., "end": ..., "back": ...}`,

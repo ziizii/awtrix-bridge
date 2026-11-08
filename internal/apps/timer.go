@@ -12,7 +12,7 @@ import (
 // timerApp shows the timer started from the admin UI (or by anything
 // that writes the timer topic). It switches the clock to itself when the
 // timer starts, counts down with a progress bar, plays the melody at the
-// end, counts up blinking for hold_after, then clears the timer and
+// end, counts up in red for hold_after, then clears the timer and
 // switches back to the app that was on screen before.
 type timerApp struct {
 	cfg    config.Timer
@@ -79,15 +79,11 @@ func (a *timerApp) Render(_ States, now time.Time) []Message {
 }
 
 // payload shows the time left with a progress bar, or after the end the
-// time since, blinking between the done color and the running color.
+// time since in the done color.
 func (a *timerApp) payload(t awtrix.Timer, now time.Time) []byte {
 	secs := int(math.Ceil(t.End.Sub(now).Seconds()))
 	if secs <= 0 {
-		color := a.cfg.DoneColor
-		if -secs%2 == 1 {
-			color = a.cfg.Color
-		}
-		return awtrix.AppPayload(a.cfg.Icon, countdownText(secs), color, nil)
+		return awtrix.AppPayload(a.cfg.Icon, countdownText(secs), a.cfg.DoneColor, nil)
 	}
 	extra := map[string]any{}
 	if total := t.End.Sub(t.Start); total > 0 {

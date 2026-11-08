@@ -52,8 +52,10 @@ func TestTimer(t *testing.T) {
 	if _, ok := byTopic(a.Render(nil, now.Add(91*time.Second)))["snd"]; ok {
 		t.Errorf("rang twice")
 	}
-	if p := decode(t, a.Render(nil, now.Add(92*time.Second))[0].Payload); p["text"] != "+0:02" || p["textColor"] != "#FF0000" {
-		t.Errorf("count-up payload %v", p)
+	for s, want := range map[int]string{92: "+0:02", 93: "+0:03"} { // steady, no blinking
+		if p := decode(t, a.Render(nil, now.Add(time.Duration(s)*time.Second))[0].Payload); p["text"] != want || p["textColor"] != "#FF0000" {
+			t.Errorf("count-up payload %v", p)
+		}
 	}
 
 	// After hold_after: switches back, removes the app, clears the state.

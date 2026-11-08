@@ -359,7 +359,7 @@ select.field {
 .timer-run { display: grid; gap: 12px; }
 .timer-info { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 12px; flex-wrap: wrap; }
 .timer-left { font-size: 34px; font-weight: 760; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.timer.done .timer-left { color: var(--danger); animation: blink 1s steps(2, jump-none) infinite; }
+.timer.done .timer-left { color: var(--danger); }
 .timer-ends { color: var(--muted); font-size: 14px; }
 .timer-bar { height: 6px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
 .timer-fill { height: 100%; width: 0; border-radius: inherit; background: var(--accent); transition: width 1s linear; }
