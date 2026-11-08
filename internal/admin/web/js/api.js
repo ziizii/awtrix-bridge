@@ -1,0 +1,26 @@
+// The bridge's JSON API (see internal/admin/admin.go).
+
+async function call(method, path, body) {
+  const opt = { method, headers: {} };
+  if (body !== undefined) {
+    opt.headers["Content-Type"] = "application/json";
+    opt.body = JSON.stringify(body);
+  }
+  const r = await fetch(path, opt);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+export const api = {
+  status: () => call("GET", "/api/status"),
+  config: () => call("GET", "/api/config").then(j => j.yaml),
+  check: yaml => call("POST", "/api/check", { yaml }),
+  saveConfig: yaml => call("PUT", "/api/config", { yaml }),
+  reload: () => call("POST", "/api/reload", {}),
+  switchTo: app => call("POST", "/api/switch", { app }),
+  arm: (app, armed) => call("POST", "/api/arm", { app, armed }),
+  playMelody: melody => call("POST", "/api/melody/play", { melody }),
+  setChime: melody => call("POST", "/api/chime", { melody }),
+  setAlert: (app, minutes, melody) => call("POST", "/api/alert", { app, minutes, melody }),
+};

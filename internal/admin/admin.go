@@ -1,12 +1,16 @@
-// Package admin serves a small web UI to view the bridge and edit its YAML
-// config. It has no authentication: expose it on a trusted network only.
+// Package admin serves the web UI: the page in web/ and a small JSON API.
+// It has no authentication: expose it on a trusted network only.
+//
+// Adding an action: add a method to Backend (implemented by
+// bridge.Supervisor), a request type and one route line in Handler.
 package admin
 
 import (
 	"context"
-	_ "embed"
+	"embed"
 	"encoding/json"
-	"io"
+	"errors"
+	"io/fs"
 	"mime"
 	"net/http"
 	"time"
@@ -14,32 +18,45 @@ import (
 	"github.com/ziizii/awtrix-bridge/internal/bridge"
 )
 
-//go:embed index.html
-var indexHTML []byte
+//go:embed web
+var webFS embed.FS
 
 // Backend is what the UI controls; *bridge.Supervisor implements it.
 type Backend interface {
+	Status() bridge.Status
 	Raw() ([]byte, error)
 	Check(raw []byte) error
 	Apply(ctx context.Context, raw []byte) error
 	Reload(ctx context.Context) error
-	Status() bridge.Status
-	SetArmed(name string, on bool) error
-	Switch(name string) error
+	Switch(app string) error
 	PlayMelody(name string) error
-	SetChime(ctx context.Context, name string) error
+	SetArmed(app string, on bool) error
+	SetChime(ctx context.Context, melody string) error
+	SetAlert(ctx context.Context, app string, minutes int, melody string) error
 }
 
-const maxConfig = 1 << 20
+// Request bodies.
+type (
+	yamlReq   struct{ YAML string }
+	appReq    struct{ App string }
+	melodyReq struct{ Melody string }
+	armReq    struct {
+		App   string
+		Armed bool
+	}
+	alertReq struct {
+		App     string
+		Minutes int
+		Melody  string
+	}
+)
 
 // Handler returns the admin HTTP handler.
 func Handler(b Backend) http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("Cache-Control", "no-store")
-		w.Write(indexHTML)
-	})
+	web, _ := fs.Sub(webFS, "web")
+	mux.Handle("GET /", noCache(http.FileServerFS(web)))
+
 	mux.HandleFunc("GET /api/status", func(w http.ResponseWriter, _ *http.Request) {
 		reply(w, http.StatusOK, b.Status())
 	})
@@ -51,148 +68,57 @@ func Handler(b Backend) http.Handler {
 		}
 		reply(w, http.StatusOK, map[string]string{"yaml": string(raw)})
 	})
-	mux.HandleFunc("POST /api/check", func(w http.ResponseWriter, r *http.Request) {
-		raw, ok := body(w, r)
-		if !ok {
-			return
-		}
-		if err := b.Check(raw); err != nil {
-			fail(w, http.StatusUnprocessableEntity, err)
-			return
-		}
-		reply(w, http.StatusOK, map[string]bool{"ok": true})
-	})
-	mux.HandleFunc("PUT /api/config", func(w http.ResponseWriter, r *http.Request) {
-		raw, ok := body(w, r)
-		if !ok {
-			return
-		}
-		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
-		defer cancel()
-		if err := b.Apply(ctx, raw); err != nil {
-			fail(w, http.StatusUnprocessableEntity, err)
-			return
-		}
-		reply(w, http.StatusOK, map[string]bool{"ok": true})
-	})
-	mux.HandleFunc("POST /api/reload", func(w http.ResponseWriter, r *http.Request) {
-		if !isJSON(r) {
-			fail(w, http.StatusUnsupportedMediaType, errJSON)
-			return
-		}
-		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
-		defer cancel()
-		if err := b.Reload(ctx); err != nil {
-			fail(w, http.StatusUnprocessableEntity, err)
-			return
-		}
-		reply(w, http.StatusOK, map[string]bool{"ok": true})
-	})
-	mux.HandleFunc("POST /api/arm", func(w http.ResponseWriter, r *http.Request) {
-		if !isJSON(r) {
-			fail(w, http.StatusUnsupportedMediaType, errJSON)
-			return
-		}
-		var in struct {
-			App   string `json:"app"`
-			Armed bool   `json:"armed"`
-		}
-		if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&in); err != nil {
-			fail(w, http.StatusBadRequest, err)
-			return
-		}
-		if err := b.SetArmed(in.App, in.Armed); err != nil {
-			fail(w, http.StatusUnprocessableEntity, err)
-			return
-		}
-		reply(w, http.StatusOK, map[string]bool{"ok": true})
-	})
-	mux.HandleFunc("POST /api/switch", func(w http.ResponseWriter, r *http.Request) {
-		if !isJSON(r) {
-			fail(w, http.StatusUnsupportedMediaType, errJSON)
-			return
-		}
-		var in struct {
-			App string `json:"app"`
-		}
-		if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&in); err != nil {
-			fail(w, http.StatusBadRequest, err)
-			return
-		}
-		if err := b.Switch(in.App); err != nil {
-			fail(w, http.StatusUnprocessableEntity, err)
-			return
-		}
-		reply(w, http.StatusOK, map[string]bool{"ok": true})
-	})
-	mux.HandleFunc("POST /api/chime/play", func(w http.ResponseWriter, r *http.Request) {
-		name, ok := melody(w, r)
-		if !ok {
-			return
-		}
-		if err := b.PlayMelody(name); err != nil {
-			fail(w, http.StatusUnprocessableEntity, err)
-			return
-		}
-		reply(w, http.StatusOK, map[string]bool{"ok": true})
-	})
-	mux.HandleFunc("POST /api/chime", func(w http.ResponseWriter, r *http.Request) {
-		name, ok := melody(w, r)
-		if !ok {
-			return
-		}
-		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
-		defer cancel()
-		if err := b.SetChime(ctx, name); err != nil {
-			fail(w, http.StatusUnprocessableEntity, err)
-			return
-		}
-		reply(w, http.StatusOK, map[string]bool{"ok": true})
-	})
+
+	mux.Handle("POST /api/check", action(func(_ context.Context, r yamlReq) error { return b.Check([]byte(r.YAML)) }))
+	mux.Handle("PUT /api/config", action(func(ctx context.Context, r yamlReq) error { return b.Apply(ctx, []byte(r.YAML)) }))
+	mux.Handle("POST /api/reload", action(func(ctx context.Context, _ struct{}) error { return b.Reload(ctx) }))
+	mux.Handle("POST /api/switch", action(func(_ context.Context, r appReq) error { return b.Switch(r.App) }))
+	mux.Handle("POST /api/arm", action(func(_ context.Context, r armReq) error { return b.SetArmed(r.App, r.Armed) }))
+	mux.Handle("POST /api/melody/play", action(func(_ context.Context, r melodyReq) error { return b.PlayMelody(r.Melody) }))
+	mux.Handle("POST /api/chime", action(func(ctx context.Context, r melodyReq) error { return b.SetChime(ctx, r.Melody) }))
+	mux.Handle("POST /api/alert", action(func(ctx context.Context, r alertReq) error {
+		return b.SetAlert(ctx, r.App, r.Minutes, r.Melody)
+	}))
 	return mux
 }
 
-func melody(w http.ResponseWriter, r *http.Request) (string, bool) {
-	if !isJSON(r) {
-		fail(w, http.StatusUnsupportedMediaType, errJSON)
-		return "", false
-	}
-	var in struct {
-		Melody string `json:"melody"`
-	}
-	if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&in); err != nil {
-		fail(w, http.StatusBadRequest, err)
-		return "", false
-	}
-	return in.Melody, true
+const (
+	maxBody       = 1 << 20 // the config editor sends the whole file
+	actionTimeout = 30 * time.Second
+)
+
+// action adapts fn to a JSON endpoint: it requires a JSON content type,
+// decodes the body into T (field names match case-insensitively), and
+// replies {"ok":true} or {"error":"..."}.
+func action[T any](fn func(context.Context, T) error) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A JSON content type makes cross-site form posts impossible
+		// (browsers preflight it), which is the only guard this UI has.
+		if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt != "application/json" {
+			fail(w, http.StatusUnsupportedMediaType, errors.New("Content-Type must be application/json"))
+			return
+		}
+		var in T
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBody)).Decode(&in); err != nil {
+			fail(w, http.StatusBadRequest, err)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), actionTimeout)
+		defer cancel()
+		if err := fn(ctx, in); err != nil {
+			fail(w, http.StatusUnprocessableEntity, err)
+			return
+		}
+		reply(w, http.StatusOK, map[string]bool{"ok": true})
+	})
 }
 
-type jsonErr string
-
-func (e jsonErr) Error() string { return string(e) }
-
-// Requiring a JSON content type makes cross-site form posts impossible
-// (browsers preflight it), which is the only guard this UI has.
-const errJSON = jsonErr("Content-Type must be application/json")
-
-func isJSON(r *http.Request) bool {
-	mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
-	return mt == "application/json"
-}
-
-func body(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
-	if !isJSON(r) {
-		fail(w, http.StatusUnsupportedMediaType, errJSON)
-		return nil, false
-	}
-	var in struct {
-		YAML string `json:"yaml"`
-	}
-	if err := json.NewDecoder(io.LimitReader(r.Body, maxConfig)).Decode(&in); err != nil {
-		fail(w, http.StatusBadRequest, err)
-		return nil, false
-	}
-	return []byte(in.YAML), true
+// noCache makes browsers revalidate the page and scripts after a deploy.
+func noCache(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache")
+		h.ServeHTTP(w, r)
+	})
 }
 
 func reply(w http.ResponseWriter, code int, v any) {

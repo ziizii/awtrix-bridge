@@ -1,0 +1,66 @@
+// Small DOM helpers shared by the sections.
+
+export const $ = id => document.getElementById(id);
+
+// el creates an element with an optional class and text.
+export function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+export function button(text, onclick, cls) {
+  const b = el("button", cls, text);
+  b.onclick = onclick;
+  return b;
+}
+
+// keyed keeps one element per key inside parent, in the order of items:
+// create(item) builds a missing element, update(element, item) refreshes
+// it. Elements are kept rather than rebuilt because the page re-renders
+// every second, and replacing a button swallows a click that lands
+// mid-update.
+export function keyed(parent, items, key, create, update) {
+  const old = new Map([...parent.children].filter(c => c.dataset.key).map(c => [c.dataset.key, c]));
+  [...parent.children].filter(c => !c.dataset.key).forEach(c => c.remove()); // placeholders
+  items.forEach((item, i) => {
+    const k = key(item);
+    let node = old.get(k);
+    if (!node) { node = create(item); node.dataset.key = k; }
+    old.delete(k);
+    update(node, item);
+    if (parent.children[i] !== node) parent.insertBefore(node, parent.children[i] || null);
+  });
+  old.forEach(n => n.remove());
+}
+
+// setOptions fills a <select> with [value, label] pairs, only when they changed.
+export function setOptions(select, pairs) {
+  const sig = JSON.stringify(pairs);
+  if (select.dataset.sig === sig) return;
+  select.dataset.sig = sig;
+  select.replaceChildren(...pairs.map(([value, label]) => {
+    const o = el("option", null, label);
+    o.value = value;
+    return o;
+  }));
+}
+
+// Run an action from a button: disable it meanwhile, report errors.
+export async function busy(btn, fn) {
+  btn.disabled = true;
+  try { await fn(); } catch (e) { alert(e.message); }
+  btn.disabled = false;
+}
+
+export function ago(t) {
+  const s = Math.round((Date.now() - new Date(t)) / 1000);
+  if (s < 60) return s + "s ago";
+  if (s < 3600) return Math.round(s / 60) + "m ago";
+  if (s < 86400) return Math.round(s / 3600) + "h ago";
+  return new Date(t).toLocaleString();
+}
+
+export const hhmm = t => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+export const hhmmss = t => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });

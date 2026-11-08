@@ -1,70 +1,12 @@
 package apps
 
 import (
-	"encoding/json"
 	"testing"
 	"time"
 
+	"encoding/json"
 	"github.com/ziizii/awtrix-bridge/internal/config"
-	"github.com/ziizii/awtrix-bridge/internal/ha"
 )
-
-type fake map[string]string
-
-func (f fake) Get(id string) (ha.State, bool) {
-	v, ok := f[id]
-	return ha.State{EntityID: id, State: v}, ok
-}
-
-func ptr(f float64) *float64 { return &f }
-
-func decode(t *testing.T, b []byte) map[string]any {
-	t.Helper()
-	var m map[string]any
-	if err := json.Unmarshal(b, &m); err != nil {
-		t.Fatalf("bad json %q: %v", b, err)
-	}
-	return m
-}
-
-var topics = Topics{App: "awtrix/cmd/apps/pushed/{name}", Settings: "s", Sound: "snd", Switch: "awtrix/cmd/apps/switch"}
-
-func TestValueThresholds(t *testing.T) {
-	a := &valueApp{topic: "t", cfg: config.App{
-		Entity: "sensor.radon", Icon: "2644", Format: "Rn %.0f Bq", Scale: 1,
-		Colors: []config.Threshold{{Below: ptr(100), Color: "green"}, {Below: ptr(300), Color: "orange"}, {Color: "red"}},
-	}}
-	for state, want := range map[string]string{"34": "green", "150": "orange", "999": "red"} {
-		m := decode(t, a.Render(fake{"sensor.radon": state}, time.Now())[0].Payload)
-		if m["textColor"] != want {
-			t.Errorf("%s: color %v, want %s", state, m["textColor"], want)
-		}
-	}
-	m := decode(t, a.Render(fake{"sensor.radon": "34"}, time.Now())[0].Payload)
-	if m["text"] != "Rn 34 Bq" || m["icon"] != "2644" {
-		t.Errorf("payload %v", m)
-	}
-	if got := a.Render(fake{"sensor.radon": "unavailable"}, time.Now())[0].Payload; got != nil {
-		t.Errorf("unavailable should remove app, got %s", got)
-	}
-}
-
-func TestFormatPower(t *testing.T) {
-	cases := map[float64]string{2900: "+2.9kW", -2900: "-2.9kW", 850: "+850W", -850: "-850W", 0: "0W"}
-	for in, want := range cases {
-		if got := FormatPower(in, true); got != want {
-			t.Errorf("FormatPower(%v) = %q, want %q", in, got, want)
-		}
-	}
-}
-
-func TestSurplusNightIcon(t *testing.T) {
-	a := &surplusApp{topic: "t", cfg: config.App{Production: "pv", Consumption: "load", Icon: "sun", NightIcon: "moon"}}
-	m := decode(t, a.Render(fake{"pv": "0", "load": "2900"}, time.Now())[0].Payload)
-	if m["icon"] != "moon" || m["text"] != "-2.9kW" || m["textColor"] != "#FF4400" {
-		t.Errorf("payload %v", m)
-	}
-}
 
 func TestCountdown(t *testing.T) {
 	now := time.Date(2026, 11, 7, 16, 0, 0, 0, time.UTC)
@@ -137,7 +79,7 @@ func TestCountdownCountUpAndSwitchBack(t *testing.T) {
 			switch m.Topic {
 			case topics.Switch:
 				switches = append(switches, decode(t, m.Payload)["name"].(string))
-			case topics.app("bus333"):
+			case topics.App("bus333"):
 				if m.Payload != nil {
 					app = decode(t, m.Payload)
 				}
@@ -167,25 +109,6 @@ func TestCountdownCountUpAndSwitchBack(t *testing.T) {
 	render(next, arrival.Add(2*time.Minute+2*time.Second))
 	if want := []string{"bus333", "Time"}; len(switches) != 2 || switches[0] != want[0] || switches[1] != want[1] {
 		t.Errorf("switches %v, want %v", switches, want)
-	}
-}
-
-func TestCarryKeepsSwitchState(t *testing.T) {
-	cfg := &config.Config{
-		Awtrix: config.Awtrix{AppTopic: "awtrix/cmd/apps/pushed/{name}"},
-		Apps:   []config.App{{Name: "bus333", Type: "countdown", Entity: "sensor.bus", SwitchAt: config.Duration(10 * time.Minute)}},
-	}
-	old, _ := Build(cfg)
-	arrival := time.Date(2026, 11, 7, 19, 18, 0, 0, time.UTC)
-	st := fake{"sensor.bus": arrival.Format(time.RFC3339)}
-	old[0].Render(st, arrival.Add(-9*time.Minute))
-
-	fresh, _ := Build(cfg)
-	Carry(old, fresh)
-	for _, m := range fresh[0].Render(st, arrival.Add(-8*time.Minute)) {
-		if m.Topic == "awtrix/cmd/apps/switch" {
-			t.Errorf("reloaded app switched again")
-		}
 	}
 }
 
@@ -256,24 +179,16 @@ func TestCountdownSwitchAt(t *testing.T) {
 	}
 }
 
-func TestSwitchTopic(t *testing.T) {
-	if got := SwitchTopic("awtrix/cmd/apps/pushed/{name}"); got != "awtrix/cmd/apps/switch" {
-		t.Errorf("got %q", got)
-	}
-}
-
 func TestCountdownRequireArm(t *testing.T) {
 	arrival := time.Date(2026, 11, 8, 6, 19, 15, 0, time.UTC)
 	next := arrival.Add(2 * time.Hour)
-	tp := topics
-	tp.Arm = "awtrix-bridge/{name}/armed"
-	a := &countdownApp{topics: tp, cfg: config.App{
+	a := &countdownApp{topics: topics, cfg: config.App{
 		Name: "bus333", Entity: "sensor.bus", RequireArm: true, HoldAfter: config.Duration(2 * time.Minute),
 		SwitchAt: config.Duration(10 * time.Minute), SwitchBack: "Time", AlertAt: config.Duration(5 * time.Minute), AlertRTTTL: "beep",
 	}}
 	render := func(target, now time.Time) (shown bool, other []string) {
 		for _, m := range a.Render(fake{"sensor.bus": target.Format(time.RFC3339)}, now) {
-			if m.Topic == tp.app("bus333") {
+			if m.Topic == topics.App("bus333") {
 				shown = m.Payload != nil
 			} else {
 				other = append(other, m.Topic+" "+string(m.Payload))
@@ -312,37 +227,37 @@ func TestCountdownRequireArm(t *testing.T) {
 	}
 }
 
-func TestChime(t *testing.T) {
-	a := &chimeApp{cfg: config.Chime{QuietEntity: "quiet"}, tune: "hour", topic: "snd"}
-	loud, quiet := fake{"quiet": "off"}, fake{"quiet": "on"}
-	at := func(h, m, s int) time.Time { return time.Date(2026, 11, 8, h, m, s, 0, time.Local) }
-	count := func(st States, from, to time.Time) (n int) {
-		for now := from; !now.After(to); now = now.Add(time.Second) {
-			n += len(a.Render(st, now))
+// An ETA that jumps back out of the alert window (delay) and in again
+// must not beep twice while armed; re-arming allows one more beep.
+func TestCountdownAlertOncePerArm(t *testing.T) {
+	a := &countdownApp{topics: topics, cfg: config.App{
+		Name: "bus333", Entity: "sensor.bus", RequireArm: true,
+		AlertAt: config.Duration(5 * time.Minute), AlertMelody: "beeps",
+	}}
+	now := time.Date(2026, 11, 8, 18, 0, 0, 0, time.UTC)
+	a.SetArmed(true, now)
+	sounds := 0
+	render := func(eta time.Duration, at time.Duration) {
+		for _, m := range a.Render(fake{"sensor.bus": now.Add(eta).Format(time.RFC3339)}, now.Add(at)) {
+			if m.Topic == "snd" {
+				sounds++
+				if !json.Valid(m.Payload) || decode(t, m.Payload)["rtttl"] != "beeps:d=16,o=6,b=180:c,p,c,p,c" {
+					t.Errorf("payload %s", m.Payload)
+				}
+			}
 		}
-		return
 	}
-	if n := count(loud, at(9, 41, 0), at(9, 59, 59)); n != 0 {
-		t.Errorf("chimed %d times after start, before the hour", n)
+	render(20*time.Minute, 16*time.Minute)                // 4 min out: beep
+	render(40*time.Minute, 17*time.Minute)                // 20 min delay: 23 min out
+	render(40*time.Minute, 36*time.Minute)                // 4 min out again: no second beep
+	render(40*time.Minute+30*time.Second, 37*time.Minute) // drift: still no
+	if sounds != 1 {
+		t.Fatalf("want 1 beep per arming, got %d", sounds)
 	}
-	if n := count(loud, at(10, 0, 0), at(10, 30, 0)); n != 1 {
-		t.Errorf("10:00: want 1 chime, got %d", n)
-	}
-	if n := count(quiet, at(10, 59, 50), at(11, 0, 30)); n != 0 {
-		t.Errorf("quiet time: want silence, got %d", n)
-	}
-	// Quiet time switching on exactly at the hour: the chime waits a few
-	// seconds, so it sees the new state.
-	a.Render(loud, at(11, 59, 59))
-	a.Render(loud, at(12, 0, 0))
-	if n := count(quiet, at(12, 0, 1), at(12, 0, 30)); n != 0 {
-		t.Errorf("quiet from 12:00:00: want silence, got %d", n)
-	}
-	// A tick that arrives well after the hour (bridge was down) stays silent.
-	if n := len(a.Render(loud, at(13, 5, 0))); n != 0 {
-		t.Errorf("late tick chimed")
-	}
-	if n := count(loud, at(13, 59, 59), at(14, 0, 10)); n != 1 {
-		t.Errorf("14:00: want 1 chime, got %d", n)
+	a.SetArmed(false, now.Add(38*time.Minute))
+	a.SetArmed(true, now.Add(38*time.Minute))
+	render(40*time.Minute, 38*time.Minute)
+	if sounds != 2 {
+		t.Errorf("re-armed: want a new beep, got %d total", sounds)
 	}
 }

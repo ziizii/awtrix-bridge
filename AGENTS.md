@@ -20,6 +20,37 @@ ssh -4 containers 'cd ~/repos/awtrix-bridge && docker compose logs --since 1m'
   host port 8095). After a deploy, the first request can return 502 while
   the container restarts.
 
+## Architecture
+
+Data flows HA WebSocket -> engine -> apps -> MQTT -> clock. Packages under
+`internal/`:
+
+| package  | role |
+|----------|------|
+| `config` | YAML types, defaults, validation (`validate.go`), built-in melodies (`melody.go`), and line-based edits that keep the file's comments (`edit.go`). |
+| `awtrix` | The clock's MQTT protocol: topics and payload builders. The only place that builds clock JSON. |
+| `apps`   | One file per app type (`value`, `surplus`, `countdown`, `brightness`, `chime`). `app.go` has the `App` interface, `Build` and `Carry`. |
+| `engine` | Single goroutine that owns all app state: routes HA states, ticks every second, dedupes and publishes. `status.go` mirrors state for other goroutines. |
+| `ha`     | Minimal HA WebSocket client (state snapshot + `state_changed`). |
+| `bridge` | `Supervisor` owns the config file and the running `instance` (MQTT + HA + engine) and swaps it on reload. `actions.go` = what the UI can do, `status.go` = what it shows. |
+| `admin`  | HTTP API (`admin.go`, one generic `action` handler) and the page in `web/` (plain ES modules, one per section in `web/js/sections/`). |
+
+Common changes:
+
+- **New app type**: add a `config.Type*` constant and its fields plus
+  validation, a file in `apps/` implementing `App` (and `carry` if it keeps
+  state across reloads), and a case in `apps.Build`. Build clock payloads with
+  `awtrix`. Apps run on the engine goroutine only, so plain fields are fine.
+- **New admin action**: a method on `bridge.Supervisor` (an immediate MQTT
+  effect, or a config edit via `s.edit` + `config.SetApp`/`SetChime`), the
+  method in `admin.Backend`, one route line in `admin.Handler`, a call in
+  `web/js/api.js`, and the UI in a section module.
+- **Changing app state from outside** (MQTT handler, UI): go through
+  `engine.exec`, never touch apps from another goroutine.
+- **Admin UI sections** re-render every second: build elements once and update
+  them in place with `keyed()` (rebuilding swallows clicks), and keep element
+  references in `node.parts`, not as properties on the element.
+
 ## Test
 
 There is no Go toolchain on the Mac. Run tests on containers (`/usr/bin/go`).

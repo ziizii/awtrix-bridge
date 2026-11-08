@@ -1,4 +1,4 @@
-// Package config loads the YAML configuration for awtrix-bridge.
+// Package config loads, validates and edits the YAML configuration.
 package config
 
 import (
@@ -8,20 +8,6 @@ import (
 
 	"gopkg.in/yaml.v3"
 )
-
-// Duration is a time.Duration that unmarshals from strings like "90s" or "30m".
-type Duration time.Duration
-
-func (d *Duration) UnmarshalYAML(n *yaml.Node) error {
-	v, err := time.ParseDuration(n.Value)
-	if err != nil {
-		return fmt.Errorf("line %d: invalid duration %q: %w", n.Line, n.Value, err)
-	}
-	*d = Duration(v)
-	return nil
-}
-
-func (d Duration) D() time.Duration { return time.Duration(d) }
 
 type Config struct {
 	HomeAssistant HomeAssistant `yaml:"homeassistant"`
@@ -33,8 +19,7 @@ type Config struct {
 }
 
 type HomeAssistant struct {
-	// URL is the HA base URL, e.g. http://homeassistant.local:8123
-	URL   string `yaml:"url"`
+	URL   string `yaml:"url"` // HA base URL, e.g. http://homeassistant.local:8123
 	Token string `yaml:"token"`
 }
 
@@ -45,69 +30,35 @@ type MQTT struct {
 	ClientID string `yaml:"client_id"`
 }
 
+// Awtrix holds the clock's MQTT topics. "{name}" in a topic is replaced
+// with the app name.
 type Awtrix struct {
-	// AppTopic is the topic for a custom app; "{name}" is replaced with the app name.
 	AppTopic      string `yaml:"app_topic"`
 	SettingsTopic string `yaml:"settings_topic"`
 	SoundTopic    string `yaml:"sound_topic"`
-	// ActiveTopic is where the clock reports the app on screen (admin UI only).
-	ActiveTopic string `yaml:"active_topic"`
-	// ArmTopic holds the retained on/off arm state of require_arm apps; "{name}" is replaced.
-	ArmTopic string `yaml:"arm_topic"`
+	SwitchTopic   string `yaml:"switch_topic"`
+	ActiveTopic   string `yaml:"active_topic"` // where the clock reports the app on screen
+	ArmTopic      string `yaml:"arm_topic"`    // retained on/off arm state of require_arm apps
 	// ResyncInterval re-publishes every app periodically so the clock recovers after a reboot.
 	ResyncInterval Duration `yaml:"resync_interval"`
 }
 
+// Brightness switches the clock to Quiet brightness while QuietEntity is on.
 type Brightness struct {
-	QuietEntity string `yaml:"quiet_entity"` // on => quiet brightness
+	QuietEntity string `yaml:"quiet_entity"`
 	Quiet       int    `yaml:"quiet"`
 	Normal      int    `yaml:"normal"`
 }
 
 // Chime plays a melody at every full hour.
 type Chime struct {
-	Melody      string `yaml:"melody"`       // a ChimeMelodies name, "off", or empty to use RTTTL
+	Melody      string `yaml:"melody"`       // a Melodies name, "off", or empty to use RTTTL
 	RTTTL       string `yaml:"rtttl"`        // custom tune when Melody is empty
 	QuietEntity string `yaml:"quiet_entity"` // on => stay silent
 }
 
-// Melody is a built-in chime tune.
-type Melody struct {
-	Name  string `json:"name"`
-	Label string `json:"label"`
-	RTTTL string `json:"-"`
-}
-
-// ChimeMelodies are the tunes selectable in the admin UI, quietest first.
-var ChimeMelodies = []Melody{
-	{"tick", "Tick: one short blip", "tick:d=32,o=6,b=200:c"},
-	{"ding", "Ding: a single note", "ding:d=16,o=6,b=120:e"},
-	{"dingdong", "Ding-dong: two notes", "dingdong:d=8,o=6,b=140:e,c"},
-	{"chirp", "Chirp: a quick rising trill", "chirp:d=32,o=7,b=200:c,e,g"},
-	{"westminster", "Westminster: four bell notes", "hour:d=4,o=5,b=140:e6,c6,d6,2g"},
-}
-
-// MelodyRTTTL returns the tune of a built-in melody.
-func MelodyRTTTL(name string) (string, bool) {
-	for _, m := range ChimeMelodies {
-		if m.Name == name {
-			return m.RTTTL, true
-		}
-	}
-	return "", false
-}
-
 // Tune returns the RTTTL to play, or "" when the chime is off.
-func (c Chime) Tune() string {
-	switch c.Melody {
-	case "off":
-		return ""
-	case "":
-		return c.RTTTL
-	}
-	t, _ := MelodyRTTTL(c.Melody)
-	return t
-}
+func (c Chime) Tune() string { return tune(c.Melody, c.RTTTL) }
 
 // Threshold selects a color: the first entry whose Below is greater than the
 // value wins; an entry without Below is the fallback.
@@ -116,15 +67,24 @@ type Threshold struct {
 	Color string   `yaml:"color"`
 }
 
+// App types.
+const (
+	TypeValue     = "value"
+	TypeSurplus   = "surplus"
+	TypeCountdown = "countdown"
+)
+
+// App is one entry of the apps list. Fields are grouped by the app types
+// that use them.
 type App struct {
 	Name string `yaml:"name"`
 	Type string `yaml:"type"` // value | surplus | countdown
 
-	// value / countdown
+	// value, countdown
 	Entity string      `yaml:"entity"`
 	Icon   string      `yaml:"icon"`
 	Color  string      `yaml:"color"`
-	Colors []Threshold `yaml:"colors"`
+	Colors []Threshold `yaml:"colors"` // countdown: thresholds in minutes remaining
 
 	// value
 	Format string  `yaml:"format"` // fmt verb applied to the numeric state, e.g. "%.0fW"
@@ -137,18 +97,22 @@ type App struct {
 	PositiveColor string `yaml:"positive_color"`
 	NegativeColor string `yaml:"negative_color"`
 
-	// countdown: Colors thresholds are in minutes remaining.
-	ShowWithin Duration `yaml:"show_within"` // only show when arrival is within this window (0 = always)
-	HoldAfter  Duration `yaml:"hold_after"`  // count up ("+0:42") this long after arrival
-	AlertAt    Duration `yaml:"alert_at"`    // play a sound once when remaining drops below this
-	AlertRTTTL string   `yaml:"alert_rtttl"`
-	SwitchAt   Duration `yaml:"switch_at"`   // switch the clock to this app once when remaining drops below this (0 = never)
-	SwitchBack string   `yaml:"switch_back"` // app to switch back to when hold_after ends, e.g. "Time"
-	RequireArm bool     `yaml:"require_arm"` // hidden until armed (admin UI / arm_topic); disarms itself after the next arrival
+	// countdown
+	ShowWithin  Duration `yaml:"show_within"`  // only show when arrival is within this window (0 = always)
+	HoldAfter   Duration `yaml:"hold_after"`   // count up ("+0:42") this long after arrival
+	AlertAt     Duration `yaml:"alert_at"`     // play the alert once when remaining drops below this
+	AlertMelody string   `yaml:"alert_melody"` // built-in melody name or "off"; overrides alert_rtttl
+	AlertRTTTL  string   `yaml:"alert_rtttl"`  // custom alert tune
+	SwitchAt    Duration `yaml:"switch_at"`    // switch the clock to this app once when remaining drops below this (0 = never)
+	SwitchBack  string   `yaml:"switch_back"`  // app to switch back to when hold_after ends, e.g. "Time"
+	RequireArm  bool     `yaml:"require_arm"`  // hidden until armed; disarms itself after the next arrival
 
 	// Extra fields merged verbatim into the AWTRIX payload (duration, rainbow, pushIcon, ...).
 	Extra map[string]any `yaml:"extra"`
 }
+
+// AlertTune returns the countdown alert's RTTTL, or "" for no alert.
+func (a App) AlertTune() string { return tune(a.AlertMelody, a.AlertRTTTL) }
 
 // Load reads the file, expands ${ENV} references and validates the result.
 func Load(path string) (*Config, error) {
@@ -163,7 +127,8 @@ func Load(path string) (*Config, error) {
 	return c, nil
 }
 
-// Parse expands ${ENV} references in raw YAML and validates the result.
+// Parse expands ${ENV} references in raw YAML, applies defaults and
+// validates the result.
 func Parse(raw []byte) (*Config, error) {
 	var c Config
 	if err := yaml.Unmarshal([]byte(os.ExpandEnv(string(raw))), &c); err != nil {
@@ -173,68 +138,16 @@ func Parse(raw []byte) (*Config, error) {
 	return &c, c.validate()
 }
 
-func (c *Config) applyDefaults() {
-	if c.MQTT.ClientID == "" {
-		c.MQTT.ClientID = "awtrix-bridge"
-	}
-	if c.Awtrix.AppTopic == "" {
-		c.Awtrix.AppTopic = "awtrix/cmd/apps/pushed/{name}"
-	}
-	if c.Awtrix.SettingsTopic == "" {
-		c.Awtrix.SettingsTopic = "awtrix/cmd/settings"
-	}
-	if c.Awtrix.SoundTopic == "" {
-		c.Awtrix.SoundTopic = "awtrix/cmd/audio/play"
-	}
-	if c.Awtrix.ActiveTopic == "" {
-		c.Awtrix.ActiveTopic = "awtrix/state/apps/active"
-	}
-	if c.Awtrix.ArmTopic == "" {
-		c.Awtrix.ArmTopic = "awtrix-bridge/{name}/armed"
-	}
-	if c.Awtrix.ResyncInterval == 0 {
-		c.Awtrix.ResyncInterval = Duration(5 * time.Minute)
-	}
-	for i := range c.Apps {
-		if c.Apps[i].Scale == 0 {
-			c.Apps[i].Scale = 1
-		}
-	}
-}
+// Duration is a time.Duration that unmarshals from strings like "90s" or "30m".
+type Duration time.Duration
 
-func (c *Config) validate() error {
-	if c.HomeAssistant.URL == "" || c.HomeAssistant.Token == "" {
-		return fmt.Errorf("homeassistant.url and homeassistant.token are required")
+func (d *Duration) UnmarshalYAML(n *yaml.Node) error {
+	v, err := time.ParseDuration(n.Value)
+	if err != nil {
+		return fmt.Errorf("line %d: invalid duration %q: %w", n.Line, n.Value, err)
 	}
-	if c.MQTT.Broker == "" {
-		return fmt.Errorf("mqtt.broker is required")
-	}
-	if ch := c.Chime; ch != nil && ch.Melody != "" && ch.Melody != "off" {
-		if _, ok := MelodyRTTTL(ch.Melody); !ok {
-			return fmt.Errorf("chime.melody: unknown melody %q", ch.Melody)
-		}
-	}
-	seen := map[string]bool{}
-	for _, a := range c.Apps {
-		if a.Name == "" {
-			return fmt.Errorf("app without name")
-		}
-		if seen[a.Name] {
-			return fmt.Errorf("duplicate app name %q", a.Name)
-		}
-		seen[a.Name] = true
-		switch a.Type {
-		case "value", "countdown":
-			if a.Entity == "" {
-				return fmt.Errorf("app %q: entity is required", a.Name)
-			}
-		case "surplus":
-			if a.Production == "" || a.Consumption == "" {
-				return fmt.Errorf("app %q: production and consumption are required", a.Name)
-			}
-		default:
-			return fmt.Errorf("app %q: unknown type %q", a.Name, a.Type)
-		}
-	}
+	*d = Duration(v)
 	return nil
 }
+
+func (d Duration) D() time.Duration { return time.Duration(d) }

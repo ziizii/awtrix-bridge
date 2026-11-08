@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,11 +18,17 @@ type fakeBackend struct {
 	switched string
 	played   string
 	chime    string
+	alert    string
 }
 
 func (f *fakeBackend) PlayMelody(name string) error { f.played = name; return nil }
 func (f *fakeBackend) SetChime(_ context.Context, name string) error {
 	f.chime = name
+	return nil
+}
+
+func (f *fakeBackend) SetAlert(_ context.Context, app string, minutes int, melody string) error {
+	f.alert = fmt.Sprintf("%s %d %s", app, minutes, melody)
 	return nil
 }
 
@@ -87,10 +94,13 @@ func TestAdmin(t *testing.T) {
 	if w := do(h, "POST", "/api/switch", "application/json", `{"app":"temp_out"}`); w.Code != 200 || b.switched != "temp_out" {
 		t.Errorf("switch: %d %q", w.Code, b.switched)
 	}
-	if w := do(h, "POST", "/api/chime/play", "application/json", `{"melody":"ding"}`); w.Code != 200 || b.played != "ding" {
+	if w := do(h, "POST", "/api/melody/play", "application/json", `{"melody":"ding"}`); w.Code != 200 || b.played != "ding" {
 		t.Errorf("play: %d %q", w.Code, b.played)
 	}
 	if w := do(h, "POST", "/api/chime", "application/json", `{"melody":"off"}`); w.Code != 200 || b.chime != "off" {
 		t.Errorf("set chime: %d %q", w.Code, b.chime)
+	}
+	if w := do(h, "POST", "/api/alert", "application/json", `{"app":"bus333","minutes":7,"melody":"beeps"}`); w.Code != 200 || b.alert != "bus333 7 beeps" {
+		t.Errorf("set alert: %d %q", w.Code, b.alert)
 	}
 }

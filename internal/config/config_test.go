@@ -38,8 +38,14 @@ func TestChimeTune(t *testing.T) {
 	if got := (Chime{RTTTL: "custom:d=4:c"}).Tune(); got != "custom:d=4:c" {
 		t.Errorf("custom: %q", got)
 	}
-	base := "homeassistant: {url: \"http://ha\", token: t}\nmqtt: {broker: \"tcp://b:1883\"}\n"
 	if _, err := Parse([]byte(base + "chime: {melody: nope}\n")); err == nil {
 		t.Error("unknown melody accepted")
+	}
+}
+
+func TestValidateAlertMelody(t *testing.T) {
+	_, err := Parse([]byte(base + "apps:\n  - {name: bus, type: countdown, entity: sensor.bus, alert_melody: nope}\n"))
+	if err == nil || err.Error() != `app "bus": alert_melody: unknown melody "nope"` {
+		t.Errorf("got %v", err)
 	}
 }

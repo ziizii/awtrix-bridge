@@ -15,7 +15,7 @@ Small Go service that pushes Home Assistant values to an AWTRIX clock over MQTT.
 |-------------|------------------------------------------------------------------------|
 | `value`     | one numeric sensor, `format` (Go fmt), fixed `color` or `colors` thresholds |
 | `surplus`   | `production - consumption` as `+1.2kW` / `-850W`, night icon when PV = 0 |
-| `countdown` | `m:ss` to a timestamp sensor, then counts up (`+0:42`) for `hold_after`. Shown within `show_within` (`0s` = always), beep at `alert_at`, switch the clock to it once at `switch_at` (`0` = never) and back to `switch_back` (e.g. `Time`) when the count-up ends. With `require_arm` it is hidden until armed and disarms itself after the next arrival. |
+| `countdown` | `m:ss` to a timestamp sensor, then counts up (`+0:42`) for `hold_after`. Shown within `show_within` (`0s` = always). Plays `alert_melody` (or a custom `alert_rtttl`) at `alert_at`, once per bus, or once per arming with `require_arm`. Switches the clock to it once at `switch_at` (`0` = never) and back to `switch_back` (e.g. `Time`) when the count-up ends. With `require_arm` it is hidden until armed and disarms itself after the next arrival. |
 
 Top-level `brightness:` switches the clock to a quiet brightness while an
 entity is on, and `chime:` plays a short melody at every full hour unless
@@ -45,12 +45,20 @@ Only a bus arriving after the moment of arming disarms it.
 ## Admin UI
 
 With `ADMIN_ADDR` set (compose: `:8080`, published on host port `8095`) the
-bridge serves a small page: the arm button, what each app currently shows on
-the clock (tap a box, including the built-in Time and Date, to switch the
-clock to it; the one on screen is highlighted), recent switches/sounds, and
-a YAML editor. **Save & reload**
-validates the config, writes `config.yaml` and restarts the pipeline in
-place; apps removed from the config are deleted from the clock. There is no
+bridge serves a small page:
+
+- **Pickup**: arm/disarm `require_arm` countdowns and set their alert
+  (minutes before arrival and melody, with a preview on the clock).
+- **Hourly chime**: pick the melody or off, preview each one, see the quiet time.
+- **On the clock**: what each app currently shows; tap one (including the
+  built-in Time and Date) to switch the clock to it.
+- **Configuration**: a YAML editor. **Save & reload** validates the config,
+  writes `config.yaml` and restarts the pipeline in place; apps removed from
+  the config are deleted from the clock.
+- **Recent switches & sounds**.
+
+Settings changed with the pickers are written into `config.yaml` as line
+edits, so comments and layout stay as they are. There is no
 password, so keep it on the LAN. `${VAR}` references stay unexpanded in the
 editor, so secrets in `.env` are never shown.
 

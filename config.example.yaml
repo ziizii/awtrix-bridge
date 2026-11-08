@@ -15,6 +15,8 @@ awtrix:
   app_topic: awtrix/cmd/apps/pushed/{name}
   settings_topic: awtrix/cmd/settings
   sound_topic: awtrix/cmd/audio/play
+  switch_topic: awtrix/cmd/apps/switch
+  active_topic: awtrix/state/apps/active  # the clock reports the app on screen here
   arm_topic: awtrix-bridge/{name}/armed   # retained on/off state of require_arm apps
   resync_interval: 5m     # re-push everything so the clock recovers after a reboot
 
@@ -83,8 +85,8 @@ apps:
     require_arm: true             # hidden until armed in the admin UI; disarms itself after the bus arrives
     show_within: 0s               # 0s = shown the whole time it is armed
     hold_after: 2m                # count up "+0:42" for 2 minutes after arrival
-    alert_at: 5m                  # beep once when 5 minutes remain
-    alert_rtttl: "two:d=4,o=5,b=200:c,e"
+    alert_at: 5m                  # beep once when 5 minutes remain (once per arming)
+    alert_melody: twotone         # built-in melody (see admin UI) or off; or set alert_rtttl
     switch_at: 10m                # jump to this app once when 10 minutes remain (0 = never)
     switch_back: Time             # ...and back to the clock when hold_after ends
     colors:                       # thresholds in minutes remaining
