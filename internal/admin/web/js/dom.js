@@ -83,8 +83,11 @@ export function ago(t) {
   if (s < 60) return s + "s ago";
   if (s < 3600) return Math.round(s / 60) + "m ago";
   if (s < 86400) return Math.round(s / 3600) + "h ago";
-  return new Date(t).toLocaleString();
+  return dateTime(t);
 }
 
-export const hhmm = t => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
-export const hhmmss = t => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+// Times are always 24-hour, whatever the browser's locale.
+const two = n => String(n).padStart(2, "0");
+export const hhmm = t => { const d = new Date(t); return two(d.getHours()) + ":" + two(d.getMinutes()); };
+export const hhmmss = t => hhmm(t) + ":" + two(new Date(t).getSeconds());
+export const dateTime = t => { const d = new Date(t); return `${d.getDate()}. ${d.getMonth() + 1}. ${d.getFullYear()} ${hhmm(d)}`; };

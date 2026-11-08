@@ -1,5 +1,13 @@
 # Agent notes
 
+## Working here
+
+This is a small hobby project driving the clock on the owner's desk.
+Commit, push and deploy finished work without asking first; just report
+what was deployed. Times in the UI and on the clock are 24-hour (no
+AM/PM), including inputs: don't rely on `<input type="time">`, which
+follows the browser locale.
+
 ## Deploy
 
 awtrix-bridge runs only on the `containers` host (192.168.11.239), built

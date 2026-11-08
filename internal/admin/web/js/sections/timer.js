@@ -50,7 +50,7 @@ function setMode(mode) {
   for (const [m, b] of Object.entries(p.segBtns)) b.setAttribute("aria-selected", m === mode);
   p.durationPane.hidden = mode !== "duration";
   p.untilPane.hidden = mode !== "until";
-  if (mode === "until" && !p.at.value) p.at.value = suggestTime();
+  if (mode === "until" && !p.atSet) setAt(suggestTime());
   updateUntilHint();
 }
 
@@ -95,22 +95,36 @@ const clampMinutes = v => Math.min(1440, Math.max(1, Math.round(Number(v) || 1))
 
 function untilPane() {
   const pane = p.untilPane = el("div", "timer-pane");
-  p.at = el("input", "field time-field");
-  p.at.type = "time";
-  p.at.setAttribute("aria-label", "End time");
-  p.at.oninput = updateUntilHint;
+  // Two 24-hour selects rather than <input type=time>, which follows the
+  // browser's locale and may show AM/PM; phones show them as wheels.
+  const two = n => String(n).padStart(2, "0");
+  p.atH = el("select", "field time-part");
+  p.atM = el("select", "field time-part");
+  setOptions(p.atH, Array.from({ length: 24 }, (_, i) => [two(i), two(i)]));
+  setOptions(p.atM, Array.from({ length: 60 }, (_, i) => [two(i), two(i)]));
+  p.atH.setAttribute("aria-label", "End hour");
+  p.atM.setAttribute("aria-label", "End minute");
+  p.atH.onchange = p.atM.onchange = () => { p.atSet = true; updateUntilHint(); };
+  const at = el("div", "time-pick");
+  at.append(p.atH, el("span", "time-colon", ":"), p.atM);
   p.atHint = el("div", "until-hint");
   const go = button("Start", () => busy(go, () => {
-    if (!p.at.value) throw new Error("Pick a time first");
-    return start(() => api.startTimerAt(p.at.value));
+    return start(() => api.startTimerAt(atValue()));
   }), "btn primary");
   go.prepend(icon("play"));
   const row = el("div", "form-row");
   const grow = el("div", "grow");
-  grow.append(p.at, p.atHint);
+  grow.append(at);
   row.append(grow, go);
-  pane.append(row);
+  pane.append(row, p.atHint);
   return pane;
+}
+
+const atValue = () => p.atH.value + ":" + p.atM.value;
+
+function setAt(hhmmValue) {
+  [p.atH.value, p.atM.value] = hhmmValue.split(":");
+  p.atSet = true;
 }
 
 // suggestTime proposes the next quarter hour at least ten minutes away.
@@ -130,8 +144,7 @@ function nextAt(value) {
 }
 
 function updateUntilHint() {
-  if (!p.at.value) { p.atHint.textContent = ""; return; }
-  const t = nextAt(p.at.value);
+  const t = nextAt(atValue());
   const tomorrow = t.getDate() !== new Date().getDate();
   p.atHint.textContent = "in " + span(t - Date.now()) + (tomorrow ? " · tomorrow" : "");
 }

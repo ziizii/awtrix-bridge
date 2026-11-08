@@ -1,6 +1,6 @@
 // The bridge itself: connection and uptime.
 
-import { el, card, ago, pretty } from "../dom.js";
+import { el, card, ago, pretty, dateTime } from "../dom.js";
 
 let values;
 
@@ -28,7 +28,7 @@ export function render(s) {
   values.mqtt.style.color = s.mqtt ? "var(--ok)" : "var(--danger)";
   values.active.textContent = s.active ? pretty(s.active) : "Unknown";
   values.started.textContent = ago(s.started);
-  values.started.title = new Date(s.started).toLocaleString();
+  values.started.title = dateTime(s.started);
   values.loaded.textContent = ago(s.loaded);
-  values.loaded.title = new Date(s.loaded).toLocaleString();
+  values.loaded.title = dateTime(s.loaded);
 }

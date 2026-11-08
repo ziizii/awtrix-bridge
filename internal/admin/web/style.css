@@ -353,8 +353,10 @@ select.field {
 .timer-pane .form-row { flex-wrap: nowrap; }
 .timer-pane .form-row .grow { flex: 1 1 auto; }
 .unit { color: var(--muted); font-weight: 600; }
-.time-field { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; min-width: 120px; flex: none !important; }
-.until-hint { color: var(--muted); font-size: 14px; }
+.time-pick { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.time-part { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; padding: 0 30px 0 12px; background-position: right 8px center; }
+.time-colon { font-size: 20px; font-weight: 700; color: var(--muted); }
+.until-hint { margin-top: -6px; color: var(--muted); font-size: 14px; }
 
 .timer-run { display: grid; gap: 12px; }
 .timer-info { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 12px; flex-wrap: wrap; }
