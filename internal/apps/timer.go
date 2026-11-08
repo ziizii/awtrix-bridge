@@ -89,16 +89,31 @@ func (a *timerApp) payload(t awtrix.Timer, now time.Time) []byte {
 	if secs <= 0 {
 		return awtrix.AppPayload(a.cfg.Icon, countdownText(secs), a.cfg.DoneColor, nil)
 	}
-	extra := map[string]any{}
-	if total := t.End.Sub(t.Start); total > 0 {
-		p := int(100 * now.Sub(t.Start) / total)
-		// awtrixng's progress keys (it rejects a payload with unknown
-		// ones). The track is white unless set, which hides a white bar.
-		extra["progress"] = min(100, max(0, p))
-		extra["progressColor"] = a.cfg.Color
-		extra["progressTrackColor"] = timerTrack
+	// awtrixng's progress keys (it rejects a payload with unknown ones).
+	// The track is white unless set, which hides a white bar.
+	extra := map[string]any{
+		"progress":           barProgress(now.Sub(t.Start), t.End.Sub(t.Start)),
+		"progressColor":      a.cfg.Color,
+		"progressTrackColor": timerTrack,
 	}
 	return awtrix.AppPayload(a.cfg.Icon, timerText(secs), a.cfg.Color, extra)
+}
+
+// barPixels is the width of the clock's progress bar: its whole bottom
+// row, with or without an icon. It lights floor(progress*32/100) pixels.
+const barPixels = 32
+
+// barProgress paces the bar like Bresenham's line: pixel k lights exactly
+// k/32 of the way through (integer math, no float drift), and the percent
+// sent is the smallest one the clock maps to that many pixels. Sending
+// the plain percentage instead lights pixels unevenly, since 100 is not a
+// multiple of 32.
+func barProgress(elapsed, total time.Duration) int {
+	if total <= 0 {
+		return 100
+	}
+	lit := min(barPixels, int(barPixels*int64(max(0, elapsed))/int64(total)))
+	return (lit*100 + barPixels - 1) / barPixels
 }
 
 // timerText renders "4:05", or "1:04:05" from an hour up.

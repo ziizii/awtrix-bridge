@@ -185,8 +185,9 @@ function compose(f, elapsed) {
       for (let i = 0; i < w; i++) set(start + d * (w + 1) + i, 7, col);
     });
   } else if (f.progress != null) {
-    const n = Math.round((Math.min(100, Math.max(0, f.progress)) / 100) * area);
-    for (let i = 0; i < area; i++) set(x0 + i, 7, i < n ? f.progressColor || "#ffffff" : f.progressTrack || DIM);
+    // Like the clock: the whole bottom row, floor(progress*32/100) lit.
+    const n = Math.floor((Math.min(100, Math.max(0, f.progress)) * W) / 100);
+    for (let i = 0; i < W; i++) set(i, 7, i < n ? f.progressColor || "#ffffff" : f.progressTrack || DIM);
   }
   return { px, scrolls };
 }

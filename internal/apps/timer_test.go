@@ -116,3 +116,27 @@ func TestTimerPayloadKeys(t *testing.T) {
 		t.Errorf("bar indistinguishable from its track: %v", p)
 	}
 }
+
+// The clock lights floor(progress*32/100) pixels; the pacer must make that
+// exactly floor(elapsed*32/total), so a 64s timer lights one pixel every
+// 2s, never early or late.
+func TestBarProgressPacing(t *testing.T) {
+	clockPixels := func(progress int) int { return progress * barPixels / 100 }
+	for _, total := range []time.Duration{20 * time.Second, 64 * time.Second, 25 * time.Minute, 24 * time.Hour} {
+		for e := time.Duration(0); e <= total; e += total / 997 {
+			want := int(barPixels * int64(e) / int64(total))
+			p := barProgress(e, total)
+			if got := clockPixels(p); got != want || p < 0 || p > 100 {
+				t.Fatalf("%v of %v: progress %d lights %d px, want %d", e, total, p, got, want)
+			}
+		}
+	}
+	for s := 0; s <= 64; s++ { // a 64s timer: pixel k at second 2k
+		if got := clockPixels(barProgress(time.Duration(s)*time.Second, 64*time.Second)); got != s/2 {
+			t.Errorf("64s timer at %ds: %d px, want %d", s, got, s/2)
+		}
+	}
+	if barProgress(-time.Second, time.Minute) != 0 || barProgress(2*time.Minute, time.Minute) != 100 || barProgress(time.Second, 0) != 100 {
+		t.Errorf("bounds")
+	}
+}
