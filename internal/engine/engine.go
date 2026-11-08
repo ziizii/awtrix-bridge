@@ -154,7 +154,7 @@ func (e *Engine) handle(ev ha.Event, now time.Time) {
 	if ev.Snapshot {
 		for _, s := range ev.States {
 			if _, watched := e.byID[s.EntityID]; watched {
-				e.states[s.EntityID] = s
+				e.setState(s)
 			}
 		}
 		e.ready = true
@@ -173,7 +173,7 @@ func (e *Engine) handle(ev ha.Event, now time.Time) {
 		if !ok {
 			continue
 		}
-		e.states[s.EntityID] = s
+		e.setState(s)
 		for _, a := range deps {
 			dirty[a] = true
 		}
@@ -204,6 +204,23 @@ func (e *Engine) render(a apps.App, now time.Time) {
 		}
 		e.record(Published{App: a.Name(), Topic: m.Topic, Payload: string(m.Payload), At: now}, m.Once)
 	}
+}
+
+// setState stores an entity state. Only the Run goroutine writes states;
+// the lock is for State readers on other goroutines.
+func (e *Engine) setState(s ha.State) {
+	e.mu.Lock()
+	e.states[s.EntityID] = s
+	e.mu.Unlock()
+}
+
+// State returns the latest known state of a watched entity. Safe to call
+// from any goroutine.
+func (e *Engine) State(id string) (ha.State, bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	s, ok := e.states[id]
+	return s, ok
 }
 
 func (e *Engine) syncArmed(a apps.App) {

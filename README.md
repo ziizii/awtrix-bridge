@@ -17,6 +17,12 @@ Small Go service that pushes Home Assistant values to an AWTRIX clock over MQTT.
 | `surplus`   | `production - consumption` as `+1.2kW` / `-850W`, night icon when PV = 0 |
 | `countdown` | `m:ss` to a timestamp sensor, then counts up (`+0:42`) for `hold_after`. Shown within `show_within` (`0s` = always), beep at `alert_at`, switch the clock to it once at `switch_at` (`0` = never) and back to `switch_back` (e.g. `Time`) when the count-up ends. With `require_arm` it is hidden until armed and disarms itself after the next arrival. |
 
+Top-level `brightness:` switches the clock to a quiet brightness while an
+entity is on, and `chime:` plays a short melody at every full hour unless
+its `quiet_entity` is on. Pick the melody (or off) in the admin UI, which
+previews each one on the clock; `melody:` names a built-in tune, or leave it
+empty and set a custom `rtttl:`.
+
 Apps whose entity is `unavailable`/`unknown` are removed from the clock
 (empty payload) until the value comes back. Any extra AWTRIX field
 (`duration`, `rainbow`, `pushIcon`, …) can be added under `extra:`.

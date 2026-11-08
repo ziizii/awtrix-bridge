@@ -26,6 +26,8 @@ type Backend interface {
 	Status() bridge.Status
 	SetArmed(name string, on bool) error
 	Switch(name string) error
+	PlayMelody(name string) error
+	SetChime(ctx context.Context, name string) error
 }
 
 const maxConfig = 1 << 20
@@ -123,7 +125,46 @@ func Handler(b Backend) http.Handler {
 		}
 		reply(w, http.StatusOK, map[string]bool{"ok": true})
 	})
+	mux.HandleFunc("POST /api/chime/play", func(w http.ResponseWriter, r *http.Request) {
+		name, ok := melody(w, r)
+		if !ok {
+			return
+		}
+		if err := b.PlayMelody(name); err != nil {
+			fail(w, http.StatusUnprocessableEntity, err)
+			return
+		}
+		reply(w, http.StatusOK, map[string]bool{"ok": true})
+	})
+	mux.HandleFunc("POST /api/chime", func(w http.ResponseWriter, r *http.Request) {
+		name, ok := melody(w, r)
+		if !ok {
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer cancel()
+		if err := b.SetChime(ctx, name); err != nil {
+			fail(w, http.StatusUnprocessableEntity, err)
+			return
+		}
+		reply(w, http.StatusOK, map[string]bool{"ok": true})
+	})
 	return mux
+}
+
+func melody(w http.ResponseWriter, r *http.Request) (string, bool) {
+	if !isJSON(r) {
+		fail(w, http.StatusUnsupportedMediaType, errJSON)
+		return "", false
+	}
+	var in struct {
+		Melody string `json:"melody"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&in); err != nil {
+		fail(w, http.StatusBadRequest, err)
+		return "", false
+	}
+	return in.Melody, true
 }
 
 type jsonErr string

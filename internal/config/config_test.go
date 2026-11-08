@@ -27,3 +27,19 @@ apps:
 		t.Error("missing token accepted")
 	}
 }
+
+func TestChimeTune(t *testing.T) {
+	if got := (Chime{Melody: "ding"}).Tune(); got != "ding:d=16,o=6,b=120:e" {
+		t.Errorf("ding: %q", got)
+	}
+	if got := (Chime{Melody: "off", RTTTL: "x"}).Tune(); got != "" {
+		t.Errorf("off: %q", got)
+	}
+	if got := (Chime{RTTTL: "custom:d=4:c"}).Tune(); got != "custom:d=4:c" {
+		t.Errorf("custom: %q", got)
+	}
+	base := "homeassistant: {url: \"http://ha\", token: t}\nmqtt: {broker: \"tcp://b:1883\"}\n"
+	if _, err := Parse([]byte(base + "chime: {melody: nope}\n")); err == nil {
+		t.Error("unknown melody accepted")
+	}
+}

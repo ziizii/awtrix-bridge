@@ -28,6 +28,7 @@ type Config struct {
 	MQTT          MQTT          `yaml:"mqtt"`
 	Awtrix        Awtrix        `yaml:"awtrix"`
 	Brightness    *Brightness   `yaml:"brightness"`
+	Chime         *Chime        `yaml:"chime"`
 	Apps          []App         `yaml:"apps"`
 }
 
@@ -61,6 +62,51 @@ type Brightness struct {
 	QuietEntity string `yaml:"quiet_entity"` // on => quiet brightness
 	Quiet       int    `yaml:"quiet"`
 	Normal      int    `yaml:"normal"`
+}
+
+// Chime plays a melody at every full hour.
+type Chime struct {
+	Melody      string `yaml:"melody"`       // a ChimeMelodies name, "off", or empty to use RTTTL
+	RTTTL       string `yaml:"rtttl"`        // custom tune when Melody is empty
+	QuietEntity string `yaml:"quiet_entity"` // on => stay silent
+}
+
+// Melody is a built-in chime tune.
+type Melody struct {
+	Name  string `json:"name"`
+	Label string `json:"label"`
+	RTTTL string `json:"-"`
+}
+
+// ChimeMelodies are the tunes selectable in the admin UI, quietest first.
+var ChimeMelodies = []Melody{
+	{"tick", "Tick: one short blip", "tick:d=32,o=6,b=200:c"},
+	{"ding", "Ding: a single note", "ding:d=16,o=6,b=120:e"},
+	{"dingdong", "Ding-dong: two notes", "dingdong:d=8,o=6,b=140:e,c"},
+	{"chirp", "Chirp: a quick rising trill", "chirp:d=32,o=7,b=200:c,e,g"},
+	{"westminster", "Westminster: four bell notes", "hour:d=4,o=5,b=140:e6,c6,d6,2g"},
+}
+
+// MelodyRTTTL returns the tune of a built-in melody.
+func MelodyRTTTL(name string) (string, bool) {
+	for _, m := range ChimeMelodies {
+		if m.Name == name {
+			return m.RTTTL, true
+		}
+	}
+	return "", false
+}
+
+// Tune returns the RTTTL to play, or "" when the chime is off.
+func (c Chime) Tune() string {
+	switch c.Melody {
+	case "off":
+		return ""
+	case "":
+		return c.RTTTL
+	}
+	t, _ := MelodyRTTTL(c.Melody)
+	return t
 }
 
 // Threshold selects a color: the first entry whose Below is greater than the
@@ -162,6 +208,11 @@ func (c *Config) validate() error {
 	}
 	if c.MQTT.Broker == "" {
 		return fmt.Errorf("mqtt.broker is required")
+	}
+	if ch := c.Chime; ch != nil && ch.Melody != "" && ch.Melody != "off" {
+		if _, ok := MelodyRTTTL(ch.Melody); !ok {
+			return fmt.Errorf("chime.melody: unknown melody %q", ch.Melody)
+		}
 	}
 	seen := map[string]bool{}
 	for _, a := range c.Apps {

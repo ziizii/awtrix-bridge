@@ -15,6 +15,14 @@ type fakeBackend struct {
 	applied  string
 	armed    map[string]bool
 	switched string
+	played   string
+	chime    string
+}
+
+func (f *fakeBackend) PlayMelody(name string) error { f.played = name; return nil }
+func (f *fakeBackend) SetChime(_ context.Context, name string) error {
+	f.chime = name
+	return nil
 }
 
 func (f *fakeBackend) Switch(name string) error {
@@ -78,5 +86,11 @@ func TestAdmin(t *testing.T) {
 	}
 	if w := do(h, "POST", "/api/switch", "application/json", `{"app":"temp_out"}`); w.Code != 200 || b.switched != "temp_out" {
 		t.Errorf("switch: %d %q", w.Code, b.switched)
+	}
+	if w := do(h, "POST", "/api/chime/play", "application/json", `{"melody":"ding"}`); w.Code != 200 || b.played != "ding" {
+		t.Errorf("play: %d %q", w.Code, b.played)
+	}
+	if w := do(h, "POST", "/api/chime", "application/json", `{"melody":"off"}`); w.Code != 200 || b.chime != "off" {
+		t.Errorf("set chime: %d %q", w.Code, b.chime)
 	}
 }

@@ -23,6 +23,11 @@ brightness:
   quiet: 1
   normal: 255
 
+chime:                          # melody at every full hour; pick one in the admin UI
+  melody: ding                  # tick | ding | dingdong | chirp | westminster | off
+  # rtttl: "..."                # or a custom tune (used when melody is empty)
+  quiet_entity: binary_sensor.heat_recovery_ventilation_quiet_time   # silent while on
+
 apps:
   - name: radon
     type: value

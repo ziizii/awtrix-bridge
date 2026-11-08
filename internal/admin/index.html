@@ -55,6 +55,11 @@ textarea { width: 100%; min-height: 420px; resize: vertical; border: 1px solid v
 .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
 .msg { font-size: 13px; white-space: pre-wrap; }
 .msg.err { color: var(--danger); } .msg.ok { color: var(--accent); } .msg.warn { color: var(--warn); }
+.mel { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+.mel:first-child { border-top: 0; }
+.mel .lbl { flex: 1; }
+.mel.sel .lbl { font-weight: 600; }
+.mel .tag { font-size: 12px; color: var(--accent); font-weight: 600; min-width: 64px; text-align: right; }
 ul.recent { list-style: none; margin: 0; padding: 0; font-size: 13px; }
 ul.recent li { padding: 4px 0; border-top: 1px solid var(--line); display: flex; gap: 10px; }
 ul.recent li:first-child { border-top: 0; }
@@ -73,6 +78,12 @@ code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
   <section id="arms-section" hidden>
     <h2>Pickup</h2>
     <div id="arms"></div>
+  </section>
+
+  <section id="chime-section" hidden>
+    <h2>Hourly chime</h2>
+    <div class="state" id="quiet" style="margin:-4px 0 6px;font-size:13px;color:var(--muted)"></div>
+    <div id="chime"></div>
   </section>
 
   <section>
@@ -187,6 +198,49 @@ function renderStatus(s) {
     row._btn.className = "big" + (a.armed ? "" : " primary");
   });
 
+  const ch = s.chime || { melodies: [] };
+  $("chime-section").hidden = !ch.melodies.length;
+  const q = ch.quiet;
+  if (!q) $("quiet").textContent = "Plays every full hour, also at night (no quiet_entity set).";
+  else {
+    const hm = t => t ? new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }) : "";
+    const span = q.from && q.to ? " " + hm(q.from) + "–" + hm(q.to) : "";
+    $("quiet").replaceChildren("Silent during quiet time" + span + " · now ",
+      el("b", null, q.on ? "quiet, chime is silent" : q.state === "off" ? "not quiet" : q.state),
+      el("span", null, " (" + (q.name || q.entity) + ")"));
+    $("quiet").title = q.entity;
+  }
+  const opts = ch.melodies.concat([{ name: "off", label: "Off" }]);
+  if (ch.melody === "custom") opts.push({ name: "custom", label: "Custom tune from the config file" });
+  keyed($("chime"), opts, m => m.name, m => {
+    const row = el("div", "mel");
+    row._lbl = el("span", "lbl", m.label);
+    row.append(row._lbl);
+    if (m.name !== "off" && m.name !== "custom") {
+      const play = el("button", null, "▶ Play");
+      play.title = "Preview on the clock";
+      play.onclick = async () => {
+        try { await api("POST", "/api/chime/play", { melody: m.name }); } catch (e) { alert(e.message); }
+      };
+      row.append(play);
+    }
+    row._use = el("button", null, "Use");
+    row._use.onclick = async () => {
+      row._use.disabled = true;
+      try { await api("POST", "/api/chime", { melody: m.name }); await loadConfigIfClean(); setTimeout(poll, 1200); }
+      catch (e) { alert(e.message); }
+      row._use.disabled = false;
+    };
+    row._tag = el("span", "tag", "Selected");
+    row.append(row._use, row._tag);
+    return row;
+  }, (row, m) => {
+    const sel = m.name === ch.melody;
+    row.classList.toggle("sel", sel);
+    row._use.hidden = sel || m.name === "custom";
+    row._tag.hidden = !sel;
+  });
+
   const now = new Date();
   const builtin = [
     { app: "Time", payload: JSON.stringify({ text: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }) }), switchable: true },
@@ -223,6 +277,10 @@ async function poll() {
   try { renderStatus(await api("GET", "/api/status")); }
   catch (e) { $("meta").textContent = "bridge unreachable: " + e.message; }
 }
+
+// After a change made from the page (e.g. chime), refresh the editor
+// unless it holds unsaved edits.
+async function loadConfigIfClean() { if (!dirty()) await loadConfig(); }
 
 async function loadConfig() {
   const j = await api("GET", "/api/config");

@@ -145,6 +145,24 @@ type Status struct {
 	Recent  []engine.Published `json:"recent"`
 	Arms    []engine.ArmState  `json:"arms"`
 	Active  string             `json:"active"` // app on screen, as the clock reports it
+	Chime   ChimeStatus        `json:"chime"`
+}
+
+// ChimeStatus is the hourly chime choice and the built-in options.
+type ChimeStatus struct {
+	Melody   string          `json:"melody"` // preset name, "off", or "custom"
+	Melodies []config.Melody `json:"melodies"`
+	Quiet    *QuietStatus    `json:"quiet,omitempty"`
+}
+
+// QuietStatus is the entity that silences the chime, as HA reports it.
+type QuietStatus struct {
+	Entity string `json:"entity"`
+	Name   string `json:"name"`
+	On     bool   `json:"on"`
+	State  string `json:"state"`
+	From   string `json:"from,omitempty"` // "after" attribute of a time-of-day sensor
+	To     string `json:"to,omitempty"`   // "before" attribute
 }
 
 func (s *Supervisor) Status() Status {
@@ -156,8 +174,99 @@ func (s *Supervisor) Status() Status {
 		st.Apps, st.Recent = inst.eng.Status()
 		st.Arms = inst.eng.Arms()
 		st.Active = inst.activeApp()
+		st.Chime = ChimeStatus{Melody: "off", Melodies: config.ChimeMelodies}
+		if ch := inst.cfg.Chime; ch != nil {
+			switch {
+			case ch.Melody != "":
+				st.Chime.Melody = ch.Melody
+			case ch.RTTTL != "":
+				st.Chime.Melody = "custom"
+			}
+			if ch.QuietEntity != "" {
+				q := &QuietStatus{Entity: ch.QuietEntity, State: "unknown"}
+				if hs, ok := inst.eng.State(ch.QuietEntity); ok {
+					q.State, q.On = hs.State, hs.State == "on"
+					q.Name, _ = hs.Attributes["friendly_name"].(string)
+					q.From, _ = hs.Attributes["after"].(string)
+					q.To, _ = hs.Attributes["before"].(string)
+				}
+				st.Chime.Quiet = q
+			}
+		}
 	}
 	return st
+}
+
+// PlayMelody plays a built-in chime melody on the clock now (preview).
+func (s *Supervisor) PlayMelody(name string) error {
+	s.mu.Lock()
+	inst := s.cur
+	s.mu.Unlock()
+	if inst == nil {
+		return errors.New("bridge not running")
+	}
+	tune, ok := config.MelodyRTTTL(name)
+	if !ok {
+		return fmt.Errorf("unknown melody %q", name)
+	}
+	p, _ := json.Marshal(map[string]string{"rtttl": tune})
+	return inst.pub.Publish(inst.cfg.Awtrix.SoundTopic, p, false)
+}
+
+// SetChime selects the hourly chime melody ("off" to silence it) by
+// editing chime.melody in the config file and reloading.
+func (s *Supervisor) SetChime(ctx context.Context, name string) error {
+	raw, err := s.Raw()
+	if err != nil {
+		return err
+	}
+	return s.Apply(ctx, setChimeMelody(raw, name))
+}
+
+// setChimeMelody sets chime.melody in raw YAML with a line edit, so the
+// file's comments and layout stay as they are. A custom rtttl line is
+// commented out because melody now takes over.
+func setChimeMelody(raw []byte, name string) []byte {
+	lines := strings.Split(string(raw), "\n")
+	start := -1
+	for i, l := range lines {
+		if strings.HasPrefix(l, "chime:") {
+			start = i
+			break
+		}
+	}
+	if start < 0 {
+		block := []string{"chime:", "  melody: " + name, ""}
+		at := len(lines)
+		for i, l := range lines {
+			if strings.HasPrefix(l, "apps:") {
+				at = i
+				break
+			}
+		}
+		lines = append(lines[:at], append(block, lines[at:]...)...)
+		return []byte(strings.Join(lines, "\n"))
+	}
+	set := false
+	i := start + 1
+	for ; i < len(lines); i++ {
+		l := lines[i]
+		if l != "" && !strings.HasPrefix(l, " ") && !strings.HasPrefix(l, "#") {
+			break // end of the chime block
+		}
+		key := strings.TrimSpace(l)
+		switch {
+		case strings.HasPrefix(key, "melody:"):
+			lines[i] = "  melody: " + name
+			set = true
+		case strings.HasPrefix(key, "rtttl:"):
+			lines[i] = "  # " + key
+		}
+	}
+	if !set {
+		lines = append(lines[:start+1], append([]string{"  melody: " + name}, lines[start+1:]...)...)
+	}
+	return []byte(strings.Join(lines, "\n"))
 }
 
 // Switch shows the named app on the clock now.
