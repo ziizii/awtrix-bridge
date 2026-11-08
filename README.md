@@ -21,7 +21,9 @@ Top-level `brightness:` switches the clock to a quiet brightness while an
 entity is on, and `chime:` plays a short melody at every full hour unless
 its `quiet_entity` is on. Pick the melody (or off) in the admin UI, which
 previews each one on the clock; `melody:` names a built-in tune, or leave it
-empty and set a custom `rtttl:`.
+empty and set a custom `rtttl:`. The chime plays right on the hour; with a time-of-day
+`quiet_entity` (HA `tod`) its `after`/`before` window decides, since the
+entity itself flips on the hour.
 
 ### Timer
 
@@ -71,11 +73,14 @@ bridge serves a small page, built for phones first:
   and every app with a preview; tap one (including the built-in Time and
   Date) to switch the clock to it.
 - **Sounds**: the hourly chime melody or off, with previews and the quiet time.
-- **Colors**: the clock's own colors (time, date, default text, weekday
-  bar; sent to the clock, which keeps them), the timer's (text, time's up,
-  progress bar and track) and each app's (single color, surplus/deficit,
-  or each threshold's color), with live previews. Timer and app colors are
-  written to `config.yaml`.
+- **Look**: colors and icons. The clock's own colors (time, date, default
+  text, weekday bar; sent to the clock, which keeps them), the timer's
+  (text, time's up, progress bar and track) and each app's (single color,
+  surplus/deficit, or each threshold), plus the timer's and each app's
+  icon. The color picker stays open while you try colors: the clock
+  switches to what you are coloring and shows each one live (nothing is
+  saved) until **Done** saves it or **Cancel** restores it. Timer and app
+  settings are written to `config.yaml`.
 - **Activity**: recent switches, sounds and arming, and the bridge's status.
 - **Config**: a YAML editor. **Save** validates the config,
   writes `config.yaml` and restarts the pipeline in place; apps removed from

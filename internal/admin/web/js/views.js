@@ -26,7 +26,7 @@ import * as editor from "./sections/editor.js";
 export const views = [
   { id: "now", title: "Now", icon: "clock", sections: [hero, pickup, timer, apps] },
   { id: "sounds", title: "Sounds", icon: "bell", sections: [chime] },
-  { id: "colors", title: "Colors", icon: "palette", sections: [colors] },
+  { id: "look", title: "Look", icon: "palette", sections: [colors] },
   { id: "activity", title: "Activity", icon: "activity", sections: [rejected, recent, system] },
   { id: "config", title: "Config", icon: "code", sections: [editor] },
 ];

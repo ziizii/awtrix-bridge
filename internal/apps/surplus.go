@@ -13,6 +13,7 @@ import (
 type surplusApp struct {
 	cfg   config.App
 	topic string
+	colorPreview
 }
 
 func (a *surplusApp) Name() string       { return a.cfg.Name }
@@ -30,9 +31,9 @@ func (a *surplusApp) Render(st States, _ time.Time) []Message {
 	if pv == 0 && a.cfg.NightIcon != "" {
 		icon = a.cfg.NightIcon
 	}
-	color := or(a.cfg.PositiveColor, "#00FF00")
-	if surplus < 0 {
-		color = or(a.cfg.NegativeColor, "#FF4400")
+	color := a.col("positive_color", or(a.cfg.PositiveColor, "#00FF00"))
+	if surplus < 0 || a.lastKey == "negative_color" { // show the color being picked
+		color = a.col("negative_color", or(a.cfg.NegativeColor, "#FF4400"))
 	}
 	return []Message{show(a.topic, awtrix.AppPayload(icon, FormatPower(surplus, true), color, a.cfg.Extra))}
 }

@@ -18,6 +18,7 @@ type timerApp struct {
 	cfg    config.Timer
 	topics awtrix.Topics
 	st     timerState
+	colorPreview
 }
 
 type timerState struct {
@@ -57,6 +58,9 @@ func (a *timerApp) SetTimer(t awtrix.Timer) {
 func (a *timerApp) Render(_ States, now time.Time) []Message {
 	t := a.st.t
 	if !t.Running() {
+		if a.previewing() { // a sample, so colors can be picked without a timer
+			return []Message{show(a.topic(), a.sample(now))}
+		}
 		return append(a.switchBack(), remove(a.topic()))
 	}
 	left := t.End.Sub(now)
@@ -82,21 +86,32 @@ func (a *timerApp) Render(_ States, now time.Time) []Message {
 	return msgs
 }
 
+// sample is what the timer looks like while colors are picked and no
+// timer runs: 2:05 left of 5:00, or 12s after the end while the done
+// color is picked.
+func (a *timerApp) sample(now time.Time) []byte {
+	t := awtrix.Timer{Start: now.Add(-175 * time.Second), End: now.Add(125 * time.Second)}
+	if a.lastKey == "done_color" {
+		t = awtrix.Timer{Start: now.Add(-5 * time.Minute), End: now.Add(-12 * time.Second)}
+	}
+	return a.payload(t, now)
+}
+
 // payload shows the time left with a progress bar, or after the end the
 // time since in the done color.
 func (a *timerApp) payload(t awtrix.Timer, now time.Time) []byte {
 	secs := int(math.Ceil(t.End.Sub(now).Seconds()))
 	if secs <= 0 {
-		return awtrix.AppPayload(a.cfg.Icon, countdownText(secs), a.cfg.DoneColor, nil)
+		return awtrix.AppPayload(a.cfg.Icon, countdownText(secs), a.col("done_color", a.cfg.DoneColor), nil)
 	}
 	// awtrixng's progress keys (it rejects a payload with unknown ones).
 	// The track is white unless set, which hides a white bar.
 	extra := map[string]any{
 		"progress":           barProgress(now.Sub(t.Start), t.End.Sub(t.Start)),
-		"progressColor":      or(a.cfg.ProgressColor, a.cfg.Color),
-		"progressTrackColor": or(a.cfg.TrackColor, timerTrack),
+		"progressColor":      a.col("progress_color", or(a.cfg.ProgressColor, a.cfg.Color)),
+		"progressTrackColor": a.col("track_color", or(a.cfg.TrackColor, timerTrack)),
 	}
-	return awtrix.AppPayload(a.cfg.Icon, timerText(secs), a.cfg.Color, extra)
+	return awtrix.AppPayload(a.cfg.Icon, timerText(secs), a.col("color", a.cfg.Color), extra)
 }
 
 // barPixels is the width of the clock's progress bar: its whole bottom

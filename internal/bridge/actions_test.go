@@ -49,3 +49,12 @@ func TestAppColorFields(t *testing.T) {
 		t.Errorf("value: %+v", got)
 	}
 }
+
+func TestAppIconFields(t *testing.T) {
+	if got := appIconFields(config.App{Type: config.TypeSurplus, Icon: "1", NightIcon: "2"}); len(got) != 2 || got[1].Key != "night_icon" || got[1].Value != "2" {
+		t.Errorf("surplus: %+v", got)
+	}
+	if got := appIconFields(config.App{Type: config.TypeValue, Icon: "6401"}); len(got) != 1 || got[0].Key != "icon" || got[0].Value != "6401" {
+		t.Errorf("value: %+v", got)
+	}
+}

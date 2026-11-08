@@ -22,10 +22,11 @@ type ColorField struct {
 	Value string `json:"value"` // "#RRGGBB"; "" = the clock's default text color
 }
 
-// AppColors are the editable colors of one configured app.
+// AppColors are the editable colors and icons of one configured app.
 type AppColors struct {
 	App    string       `json:"app"`
 	Fields []ColorField `json:"fields"`
+	Icons  []ColorField `json:"icons"` // Value is a LaMetric icon id, "" = none
 }
 
 type ColorsStatus struct {
@@ -89,7 +90,7 @@ func (i *instance) colorsStatus() ColorsStatus {
 	}
 
 	for _, a := range i.cfg.Apps {
-		st.Apps = append(st.Apps, AppColors{App: a.Name, Fields: appColorFields(a)})
+		st.Apps = append(st.Apps, AppColors{App: a.Name, Fields: appColorFields(a), Icons: appIconFields(a)})
 	}
 	return st
 }
@@ -119,6 +120,42 @@ func appColorFields(a config.App) []ColorField {
 		out = append(out, ColorField{Key: fmt.Sprintf("colors.%d", n), Label: label, Value: th.Color})
 	}
 	return out
+}
+
+// appIconFields lists an app's icons: surplus also has one for when the
+// panels produce nothing.
+func appIconFields(a config.App) []ColorField {
+	out := []ColorField{{Key: "icon", Label: "Icon", Value: a.Icon}}
+	if a.Type == config.TypeSurplus {
+		out[0].Label = "Day icon"
+		out = append(out, ColorField{Key: "night_icon", Label: "Night icon", Value: a.NightIcon})
+	}
+	return out
+}
+
+// SetAppIcon sets an app's icon (key "icon", or "night_icon" for
+// surplus) to a LaMetric icon id, uploading it to the clock first if it
+// is missing there; "" removes it.
+func (s *Supervisor) SetAppIcon(ctx context.Context, app, key, id string) error {
+	inst, err := s.current()
+	if err != nil {
+		return err
+	}
+	var fields []ColorField
+	for _, a := range inst.cfg.Apps {
+		if a.Name == app {
+			fields = appIconFields(a)
+		}
+	}
+	if !hasKey(fields, key) {
+		return fmt.Errorf("app %q has no icon %q", app, key)
+	}
+	if err := inst.checkIcon(ctx, id); err != nil {
+		return err
+	}
+	return s.edit(ctx, func(raw []byte) ([]byte, error) {
+		return config.SetApp(raw, app, []config.Field{{Key: key, Value: strconv.Quote(id)}})
+	})
 }
 
 // SetColor changes one color: of the clock (target "clock", keys from
@@ -204,4 +241,57 @@ func hasKey(fields []ColorField, key string) bool {
 		}
 	}
 	return false
+}
+
+// PreviewColor shows a color on the clock while it is being picked,
+// without saving it: clock colors are sent to the clock (the picker sends
+// the old one back on cancel), timer and app colors are shown by the
+// running app until EndPreview or SetColor.
+func (s *Supervisor) PreviewColor(target, app, key, value string) error {
+	inst, err := s.current()
+	if err != nil {
+		return err
+	}
+	switch target {
+	case ColorClock:
+		return inst.setClockColor(key, value)
+	case ColorTimer:
+		app = config.TimerApp
+		if !hasKey(inst.colorsStatus().Timer, key) {
+			return fmt.Errorf("unknown timer color %q", key)
+		}
+	case ColorApp:
+		var fields []ColorField
+		for _, a := range inst.cfg.Apps {
+			if a.Name == app {
+				fields = appColorFields(a)
+			}
+		}
+		if !hasKey(fields, key) {
+			return fmt.Errorf("app %q has no color %q", app, key)
+		}
+	default:
+		return fmt.Errorf("unknown color target %q", target)
+	}
+	if err := config.CheckColor(value); err != nil {
+		return err
+	}
+	inst.eng.PreviewColor(app, key, value)
+	return nil
+}
+
+// EndPreview drops previewed timer or app colors (the picker was
+// cancelled); clock colors need nothing.
+func (s *Supervisor) EndPreview(target, app string) error {
+	inst, err := s.current()
+	if err != nil {
+		return err
+	}
+	switch target {
+	case ColorTimer:
+		inst.eng.EndPreview(config.TimerApp)
+	case ColorApp:
+		inst.eng.EndPreview(app)
+	}
+	return nil
 }

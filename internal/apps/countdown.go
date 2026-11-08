@@ -18,6 +18,7 @@ type countdownApp struct {
 	cfg    config.App
 	topics awtrix.Topics
 	st     countdownState
+	colorPreview
 }
 
 // countdownState is the runtime state kept across renders and reloads.
@@ -100,7 +101,7 @@ func (a *countdownApp) visible(target time.Time, remaining, hold time.Duration) 
 
 func (a *countdownApp) payload(remaining time.Duration) []byte {
 	secs := int(math.Ceil(remaining.Seconds()))
-	color := pickColor(float64(secs)/60, a.cfg.Color, a.cfg.Colors)
+	color := pickColor(float64(secs)/60, a.col("color", a.cfg.Color), a.thresholds(a.cfg.Colors))
 	return awtrix.AppPayload(a.cfg.Icon, countdownText(secs), color, a.cfg.Extra)
 }
 

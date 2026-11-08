@@ -24,7 +24,8 @@ func (s *Supervisor) Switch(app string) error {
 	if err != nil {
 		return err
 	}
-	known := slices.Contains(awtrix.BuiltinApps, app) || slices.ContainsFunc(inst.cfg.Apps, func(a config.App) bool { return a.Name == app })
+	known := slices.Contains(awtrix.BuiltinApps, app) || app == config.TimerApp ||
+		slices.ContainsFunc(inst.cfg.Apps, func(a config.App) bool { return a.Name == app })
 	if !known {
 		return fmt.Errorf("cannot switch to %q", app)
 	}
@@ -196,15 +197,25 @@ func (s *Supervisor) SetTimerIcon(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	if id != "" {
-		if !awtrix.IconID.MatchString(id) {
-			return fmt.Errorf("icon must be a LaMetric icon number, got %q", id)
-		}
-		if err := inst.ensureIcon(ctx, id); err != nil {
-			return fmt.Errorf("icon %s: %w", id, err)
-		}
+	if err := inst.checkIcon(ctx, id); err != nil {
+		return err
 	}
 	return s.edit(ctx, func(raw []byte) ([]byte, error) {
 		return config.SetSection(raw, "timer", []config.Field{{Key: "icon", Value: strconv.Quote(id)}}), nil
 	})
+}
+
+// checkIcon accepts "" (no icon) or a LaMetric icon id, which it makes
+// sure the clock has.
+func (i *instance) checkIcon(ctx context.Context, id string) error {
+	if id == "" {
+		return nil
+	}
+	if !awtrix.IconID.MatchString(id) {
+		return fmt.Errorf("icon must be a LaMetric icon number, got %q", id)
+	}
+	if err := i.ensureIcon(ctx, id); err != nil {
+		return fmt.Errorf("icon %s: %w", id, err)
+	}
+	return nil
 }

@@ -7,7 +7,8 @@ import (
 	"github.com/ziizii/awtrix-bridge/internal/config"
 )
 
-// chimeApp plays a melody when a new hour starts, unless quiet time is on.
+// chimeApp plays a melody right as a new hour starts (the engine ticks on
+// whole seconds), unless quiet time is on at that hour.
 type chimeApp struct {
 	cfg   config.Chime
 	tune  string
@@ -15,13 +16,9 @@ type chimeApp struct {
 	hour  time.Time // hour already handled
 }
 
-// The chime waits chimeDelay after the full hour so a quiet-time entity
-// that flips exactly on the hour (e.g. 21:00) is already updated. A tick
-// later than chimeLate (the bridge was down) stays silent.
-const (
-	chimeDelay = 5 * time.Second
-	chimeLate  = time.Minute
-)
+// A tick later than chimeLate after the hour (the bridge was down)
+// stays silent.
+const chimeLate = time.Minute
 
 func (a *chimeApp) Name() string { return "chime" }
 func (a *chimeApp) Entities() []string {
@@ -38,13 +35,39 @@ func (a *chimeApp) Render(st States, now time.Time) []Message {
 		a.hour = hour // never chime just because the bridge started
 		return nil
 	}
-	since := now.Sub(hour)
-	if !hour.After(a.hour) || since < chimeDelay {
+	if !hour.After(a.hour) {
 		return nil
 	}
 	a.hour = hour
-	if since > chimeLate || isOn(st, a.cfg.QuietEntity) {
+	if now.Sub(hour) > chimeLate || quietAt(st, a.cfg.QuietEntity, hour) {
 		return nil
 	}
 	return []Message{event(a.topic, awtrix.SoundPayload(a.tune))}
+}
+
+// quietAt reports whether the quiet entity is on at t. A time-of-day
+// sensor (HA "tod") flips exactly on the hour, so at hh:00:00 its new
+// state may not have arrived yet; its after/before attributes give the
+// window (the current one while on, the next while off), which decides
+// instead. Other entities go by their state.
+func quietAt(st States, id string, t time.Time) bool {
+	if id == "" {
+		return false
+	}
+	s, ok := st.Get(id)
+	if !ok {
+		return false
+	}
+	after, ok1 := attrTime(s.Attributes, "after")
+	before, ok2 := attrTime(s.Attributes, "before")
+	if ok1 && ok2 {
+		return !t.Before(after) && t.Before(before)
+	}
+	return s.State == "on"
+}
+
+func attrTime(attrs map[string]any, key string) (time.Time, bool) {
+	v, _ := attrs[key].(string)
+	t, err := time.Parse(time.RFC3339, v)
+	return t, err == nil
 }

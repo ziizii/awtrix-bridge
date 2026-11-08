@@ -38,6 +38,18 @@ func (f *fakeBackend) SetTimerIcon(_ context.Context, icon string) error {
 	f.timer = "icon " + icon
 	return nil
 }
+func (f *fakeBackend) SetAppIcon(_ context.Context, app, key, icon string) error {
+	f.timer = fmt.Sprintf("app icon %s %s %s", app, key, icon)
+	return nil
+}
+func (f *fakeBackend) PreviewColor(target, app, key, value string) error {
+	f.timer = fmt.Sprintf("preview %s %s %s %s", target, app, key, value)
+	return nil
+}
+func (f *fakeBackend) EndPreview(target, app string) error {
+	f.timer = "end " + target + " " + app
+	return nil
+}
 func (f *fakeBackend) CancelTimer() error { f.timer = "cancel"; return nil }
 func (f *fakeBackend) SetTimerMelody(_ context.Context, melody string) error {
 	f.timer = "melody " + melody
@@ -131,7 +143,10 @@ func TestAdmin(t *testing.T) {
 		`/api/timer {"at":"14:30"}`:        "start 0 14:30",
 		`/api/timer/extend {"seconds":60}`: "extend 60",
 		`/api/timer/cancel {}`:             "cancel",
-		`/api/timer/icon {"icon":"1820"}`:  "icon 1820",
+		`/api/color/preview {"target":"timer","key":"color","value":"#00FF00"}`:     "preview timer  color #00FF00",
+		`/api/color/end {"target":"app","app":"solar"}`:                             "end app solar",
+		`/api/icon {"app":"surplus","key":"night_icon","icon":"13345"}`:             "app icon surplus night_icon 13345",
+		`/api/timer/icon {"icon":"1820"}`:                                           "icon 1820",
 		`/api/color {"target":"app","app":"solar","key":"color","value":"#FFCC00"}`: "color app solar color #FFCC00",
 		`/api/timer/melody {"melody":"ding"}`:                                       "melody ding",
 	} {

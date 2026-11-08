@@ -12,6 +12,7 @@ import (
 type valueApp struct {
 	cfg   config.App
 	topic string
+	colorPreview
 }
 
 func (a *valueApp) Name() string       { return a.cfg.Name }
@@ -25,6 +26,6 @@ func (a *valueApp) Render(st States, _ time.Time) []Message {
 	}
 	v *= a.cfg.Scale
 	text := fmt.Sprintf(or(a.cfg.Format, "%g"), v)
-	color := pickColor(v, a.cfg.Color, a.cfg.Colors)
+	color := pickColor(v, a.col("color", a.cfg.Color), a.thresholds(a.cfg.Colors))
 	return []Message{show(a.topic, awtrix.AppPayload(a.cfg.Icon, text, color, a.cfg.Extra))}
 }

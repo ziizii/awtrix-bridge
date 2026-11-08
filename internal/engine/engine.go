@@ -34,6 +34,7 @@ type Engine struct {
 	ready   bool              // first snapshot received
 	resyncC chan struct{}
 	cmds    chan func(now time.Time)
+	preview map[string]time.Time // app -> when its color preview lapses
 
 	status *status
 }
@@ -46,7 +47,7 @@ func New(list []apps.App, pub Publisher, resync time.Duration, log *slog.Logger)
 	e := &Engine{
 		apps: list, byID: map[string][]apps.App{}, pub: pub, resync: resync, log: log,
 		states: store{}, last: map[string][]byte{},
-		resyncC: make(chan struct{}, 1), cmds: make(chan func(time.Time), 16),
+		resyncC: make(chan struct{}, 1), cmds: make(chan func(time.Time), 16), preview: map[string]time.Time{},
 		status: newStatus(list),
 	}
 	for _, a := range list {
@@ -78,6 +79,13 @@ func (e *Engine) exec(name string, f func(now time.Time)) {
 
 // Run is the single goroutine that owns all app state.
 func (e *Engine) Run(ctx context.Context, events <-chan ha.Event) {
+	// Tick on whole seconds, so the chime lands on the hour and timers on
+	// their seconds instead of up to a second late.
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(time.Until(time.Now().Truncate(time.Second).Add(time.Second))):
+	}
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	resync := time.NewTicker(e.resync)
@@ -137,6 +145,11 @@ func (e *Engine) handle(ev ha.Event, now time.Time) {
 func (e *Engine) tick(now time.Time) {
 	if !e.ready {
 		return
+	}
+	for name, until := range e.preview {
+		if now.After(until) { // the picker was abandoned
+			e.endPreview(name, now)
+		}
 	}
 	for _, a := range e.apps {
 		if a.Ticking() {
@@ -201,6 +214,42 @@ func (e *Engine) SetArmed(name string, on bool) {
 			}
 		}
 	})
+}
+
+// previewFor is how long a color preview lasts without another change.
+const previewFor = 2 * time.Minute
+
+// PreviewColor shows a color on the clock without saving it (the admin
+// UI's picker); it lapses after previewFor. Safe from any goroutine.
+func (e *Engine) PreviewColor(app, key, color string) {
+	e.exec("preview", func(now time.Time) {
+		for _, a := range e.apps {
+			if p, ok := a.(apps.Previewable); ok && a.Name() == app {
+				p.SetPreview(key, color)
+				e.preview[app] = now.Add(previewFor)
+				if e.ready {
+					e.render(a, now)
+				}
+			}
+		}
+	})
+}
+
+// EndPreview drops an app's previewed colors. Safe from any goroutine.
+func (e *Engine) EndPreview(app string) {
+	e.exec("end preview", func(now time.Time) { e.endPreview(app, now) })
+}
+
+func (e *Engine) endPreview(app string, now time.Time) {
+	delete(e.preview, app)
+	for _, a := range e.apps {
+		if p, ok := a.(apps.Previewable); ok && a.Name() == app {
+			p.ClearPreview()
+			if e.ready {
+				e.render(a, now)
+			}
+		}
+	}
 }
 
 // SetTimer applies the timer state read from its retained topic. Safe to

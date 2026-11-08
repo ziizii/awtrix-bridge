@@ -38,7 +38,10 @@ type Backend interface {
 	CancelTimer() error
 	SetTimerMelody(ctx context.Context, melody string) error
 	SetTimerIcon(ctx context.Context, icon string) error
+	SetAppIcon(ctx context.Context, app, key, icon string) error
 	SetColor(ctx context.Context, target, app, key, value string) error
+	PreviewColor(target, app, key, value string) error
+	EndPreview(target, app string) error
 }
 
 // Request bodies.
@@ -100,6 +103,13 @@ func Handler(b Backend) http.Handler {
 	mux.Handle("POST /api/timer/cancel", action(func(_ context.Context, _ struct{}) error { return b.CancelTimer() }))
 	mux.Handle("POST /api/timer/melody", action(func(ctx context.Context, r melodyReq) error { return b.SetTimerMelody(ctx, r.Melody) }))
 	mux.Handle("POST /api/timer/icon", action(func(ctx context.Context, r struct{ Icon string }) error { return b.SetTimerIcon(ctx, r.Icon) }))
+	mux.Handle("POST /api/icon", action(func(ctx context.Context, r struct{ App, Key, Icon string }) error {
+		return b.SetAppIcon(ctx, r.App, r.Key, r.Icon)
+	}))
+	mux.Handle("POST /api/color/preview", action(func(_ context.Context, r colorReq) error {
+		return b.PreviewColor(r.Target, r.App, r.Key, r.Value)
+	}))
+	mux.Handle("POST /api/color/end", action(func(_ context.Context, r colorReq) error { return b.EndPreview(r.Target, r.App) }))
 	mux.Handle("POST /api/color", action(func(ctx context.Context, r colorReq) error {
 		return b.SetColor(ctx, r.Target, r.App, r.Key, r.Value)
 	}))
